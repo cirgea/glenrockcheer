@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14161A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="GR Cheer">
+<title>Glen Rock Cheer Coverage Board</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#C8102E; --red-dark:#9C0A22; --ink:#14161A; --slate:#5D6570;
+  --line:#E3E1DC; --snow:#F6F5F3; --card:#FFFFFF;
+  --ok:#1F8A4C; --warn:#C97A0A; --gap:#C8102E;
+  --ok-bg:#EAF4EE; --warn-bg:#FBF1E2; --gap-bg:#FAE9EC;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--snow); color:var(--ink); font:15px/1.5 'Barlow',system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; padding-bottom:env(safe-area-inset-bottom)}
+button{font-family:inherit; cursor:pointer}
+:focus-visible{outline:3px solid var(--red); outline-offset:2px}
+input,select{background:#fff; color:var(--ink); border:1px solid var(--line); border-radius:6px;
+  padding:10px 11px; font:14px 'Barlow',sans-serif; max-width:100%}
+input:focus,select:focus{border-color:var(--ink); outline:none}
+.mono{font-family:'IBM Plex Mono',monospace; font-size:.85em}
+.cond{font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.05em}
+
+/* varsity header */
+.hd{background:var(--ink); color:#fff; padding:14px 16px 12px}
+.hd-row{display:flex; justify-content:space-between; align-items:baseline; gap:12px; max-width:1040px; margin:0 auto}
+.wordmark{font-family:'Barlow Condensed',sans-serif; font-weight:700; text-transform:uppercase;
+  font-size:24px; letter-spacing:.06em; line-height:1}
+.wordmark b{color:var(--red); font-weight:700; margin-left:7px}
+.hd-sub{color:#B9BDC4; font-size:12px; text-transform:uppercase; letter-spacing:.12em; white-space:nowrap}
+.stripe{height:4px; background:var(--red)}
+.stripe2{height:2px; background:var(--red); margin-top:2px}
+
+/* admin tabs */
+.tabs{display:flex; gap:0; background:var(--ink); padding:0 8px; overflow-x:auto}
+.tabs-in{display:flex; max-width:1040px; margin:0 auto; width:100%}
+.tab{background:none; border:none; border-bottom:3px solid transparent; color:#B9BDC4;
+  font-family:'Barlow Condensed',sans-serif; font-weight:600; text-transform:uppercase;
+  letter-spacing:.09em; font-size:16px; padding:12px 16px 10px}
+.tab.on{color:#fff; border-bottom-color:var(--red)}
+
+.wrap{max-width:1040px; margin:0 auto; padding:16px}
+
+/* summary strip */
+.strip{display:flex; align-items:flex-end; gap:26px; flex-wrap:wrap; padding-bottom:14px;
+  border-bottom:2px solid var(--ink); margin-bottom:14px}
+.score{display:flex; flex-direction:column}
+.score-n{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:46px; line-height:.85}
+.score-l{font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--slate); margin-top:5px}
+.strip-btns{margin-left:auto; display:flex; gap:6px; flex-wrap:wrap}
+
+.btn{border-radius:6px; padding:10px 14px; font-size:13.5px; font-weight:500;
+  border:1px solid var(--line); background:#fff; color:var(--ink); min-height:42px}
+.btn:hover{border-color:var(--slate)}
+.btn-red{background:var(--red); border-color:var(--red); color:#fff; font-weight:600}
+.btn-red:hover{background:var(--red-dark)}
+.btn-ghost{background:none}
+.btn-danger{background:none; border-color:var(--gap); color:var(--gap)}
+.btn-sm{padding:6px 10px; font-size:12.5px; min-height:34px}
+
+/* filters */
+.filters{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px}
+.chips{display:flex; gap:6px; flex-wrap:wrap}
+.chip{background:#fff; border:1px solid var(--line); color:var(--slate); border-radius:999px;
+  padding:6px 13px; font-size:13px; display:inline-flex; align-items:center; gap:7px; min-height:36px}
+.chip.on{color:var(--ink); border-color:var(--ink); font-weight:600}
+.dot{width:9px; height:9px; border-radius:2px; display:inline-block; flex:none}
+.tgl{display:flex; align-items:center; gap:7px; font-size:13px; color:var(--slate); cursor:pointer}
+.tgl input{width:16px; height:16px; padding:0}
+
+/* day bars */
+.day{display:flex; align-items:center; gap:10px; margin:20px 0 8px}
+.day-dow{font-family:'Barlow Condensed',sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.12em; font-size:15px}
+.day-date{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--slate)}
+.day-rule{flex:1; height:1px; background:var(--line)}
+.day.today .day-dow{color:var(--red)}
+
+/* session cards */
+.sess{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--line);
+  border-radius:8px; margin-bottom:8px; overflow:hidden}
+.lvl-set{border-left-color:var(--ok)}
+.lvl-fillable,.lvl-thin{border-left-color:var(--warn)}
+.lvl-short{border-left-color:var(--gap)}
+.sess-main{width:100%; display:flex; align-items:center; gap:13px; padding:13px 14px;
+  background:none; border:none; color:inherit; text-align:left}
+.sess-main:hover{background:#FBFAF8}
+.s-time{font-family:'IBM Plex Mono',monospace; display:flex; flex-direction:column; min-width:54px; flex:none}
+.s-time b{font-size:15px; font-weight:500}
+.s-time span{font-size:11px; color:var(--slate)}
+.s-mid{flex:1; min-width:0}
+.s-title{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.s-squad{font-family:'Barlow Condensed',sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:.06em; font-size:18px}
+.s-type{font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--slate);
+  border:1px solid var(--line); border-radius:4px; padding:2px 7px}
+.s-sub{display:flex; gap:12px; flex-wrap:wrap; color:var(--slate); font-size:12.5px; margin-top:3px}
+.s-conflict{color:var(--gap); font-weight:500}
+.s-right{display:flex; align-items:center; gap:9px; flex:none}
+.s-count{font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--slate); min-width:30px; text-align:right}
+.slots{display:flex; gap:3px}
+.slot{width:13px; height:22px; border-radius:2px; border:1px solid var(--line); display:block}
+.slot.fill{border-color:transparent}
+.slot.open{border-style:dashed; border-color:#B9BDC4; background:none}
+.slot.open.short{border-style:solid; border-color:var(--gap); background:var(--gap-bg)}
+.slot.open.warn{border-color:var(--warn)}
+.lvl-tag{font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; font-weight:600;
+  border-radius:4px; padding:2px 7px}
+.lt-set{color:var(--ok); background:var(--ok-bg)}
+.lt-fillable,.lt-thin{color:var(--warn); background:var(--warn-bg)}
+.lt-short{color:var(--gap); background:var(--gap-bg)}
+
+/* expanded assign panel */
+.sess-open{border-top:1px solid var(--line); padding:12px 14px; background:#FBFAF8}
+.open-hint{margin:0 0 10px; font-size:12.5px; color:var(--slate)}
+.cgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:7px}
+.cpick{display:flex; justify-content:space-between; align-items:center; gap:8px; background:#fff;
+  border:1px solid var(--line); border-radius:6px; padding:10px 11px; color:var(--ink);
+  font-size:13.5px; text-align:left; min-height:46px}
+.cpick:hover{border-color:var(--slate)}
+.cpick.assigned{border-color:var(--red); box-shadow:inset 0 0 0 1px var(--red); background:var(--gap-bg)}
+.cpick.av-out{opacity:.45}
+.cp-name{display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap}
+.cp-av{font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase;
+  letter-spacing:.05em; color:var(--slate); flex:none}
+.av-in .cp-av{color:var(--ok); font-weight:600}
+.av-maybe .cp-av{color:var(--warn); font-weight:600}
+.av-out .cp-av{color:var(--gap)}
+.star{color:var(--warn); font-size:11px}
+.badge{font-family:'IBM Plex Mono',monospace; font-size:10px; background:var(--snow);
+  border:1px solid var(--line); border-radius:3px; padding:1px 5px; color:var(--slate)}
+.note{margin:10px 0 0; font-size:13px; color:var(--slate); border-left:2px solid var(--line); padding-left:10px}
+.warnline{margin:9px 0 0; font-size:12.5px; color:var(--gap); font-weight:500}
+
+/* coach view */
+.me-head{display:flex; justify-content:space-between; align-items:flex-end; gap:14px; flex-wrap:wrap;
+  border-bottom:2px solid var(--ink); padding-bottom:12px; margin-bottom:4px}
+.me-head h2{font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.05em;
+  font-size:26px; margin:0; font-weight:700}
+.me-head p{margin:3px 0 0; color:var(--slate); font-size:13.5px}
+.me-head p.due{color:var(--red); font-weight:600}
+.acard{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:13px 14px; margin-bottom:8px}
+.acard.due{border-left:4px solid var(--red)}
+.acard.answered{border-left:4px solid var(--line)}
+.a-top{display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap}
+.working{display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.08em; color:#fff; background:var(--red);
+  border-radius:4px; padding:3px 8px}
+.tri{display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; margin-top:11px}
+.tri-b{flex:1; background:#fff; border:none; border-right:1px solid var(--line); color:var(--slate);
+  padding:13px 8px; font-size:15px; font-weight:600; min-height:50px}
+.tri-b:last-child{border-right:none}
+.tri-b:hover{background:var(--snow); color:var(--ink)}
+.tri-b.on-in{background:var(--ok); color:#fff}
+.tri-b.on-maybe{background:var(--warn); color:#fff}
+.tri-b.on-out{background:var(--ink); color:#fff}
+
+/* panels & setup */
+.panel{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:14px}
+.panel h2{font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.07em;
+  font-size:20px; margin:0 0 6px; font-weight:700}
+.hint{color:var(--slate); font-size:13px; margin:0 0 13px; max-width:72ch}
+.form{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:13px}
+.field{display:flex; flex-direction:column; gap:5px}
+.field.wide{grid-column:1/-1}
+.field>span{font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--slate)}
+.rows{display:flex; flex-direction:column; gap:7px; margin-bottom:12px}
+.erow{display:flex; align-items:center; gap:9px; flex-wrap:wrap; background:var(--snow);
+  border:1px solid var(--line); border-radius:6px; padding:9px 11px}
+.erow.past{opacity:.5}
+.erow.cancelled{opacity:.55}
+.cancel-tag{font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--gap);
+  border:1px solid var(--gap); border-radius:3px; padding:1px 6px}
+.inline{min-width:120px; flex:0 1 auto}
+.mini{display:flex; align-items:center; gap:6px; font-size:11px; text-transform:uppercase;
+  letter-spacing:.07em; color:var(--slate)}
+.mini input{width:58px; padding:7px 8px}
+.sqpick{display:flex; gap:5px; flex-wrap:wrap; flex:1}
+.chip-sm{padding:4px 10px; font-size:12px; min-height:30px}
+.x{margin-left:auto; background:none; border:1px solid var(--line); color:var(--slate);
+  border-radius:5px; padding:5px 11px; font-size:12.5px}
+.x:hover{color:var(--gap); border-color:var(--gap)}
+.syncbox{margin-top:12px; font-size:13.5px; border-left:3px solid var(--red); padding:2px 0 2px 11px}
+.syncbox div{margin:2px 0}
+.syncerr{color:var(--gap)}
+.mutetxt{color:var(--slate)}
+
+.empty{text-align:center; padding:52px 18px; border:1px dashed var(--line); border-radius:8px; background:#fff}
+.empty h2{font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.07em; font-size:22px; margin:0 0 8px}
+.empty p{color:var(--slate); margin:0 0 16px}
+
+.gate{max-width:420px; margin:64px auto; text-align:center; padding:0 20px}
+.gate .wordmark{color:var(--ink); font-size:34px}
+.gate .wordmark b{color:var(--red)}
+.gate p{color:var(--slate)}
+
+.pickgrid{display:flex; flex-direction:column; gap:8px; margin-top:18px}
+.pickbtn{background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px;
+  font-size:16px; font-weight:600; min-height:52px; color:var(--ink)}
+.pickbtn:hover{border-color:var(--ink)}
+.linkbtn{background:none; border:none; color:var(--red); font:inherit; font-size:12px; text-decoration:underline; padding:0}
+.foot{color:var(--slate); font-size:12px; text-align:center; padding:6px 16px 22px}
+.toast{position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+  background:var(--ink); color:#fff; border-radius:999px; padding:9px 18px; font-size:13.5px;
+  box-shadow:0 4px 14px rgba(0,0,0,.25); z-index:50; opacity:0; transition:opacity .18s; pointer-events:none}
+.toast.show{opacity:1}
+.toast.err{background:var(--red)}
+
+@media (max-width:640px){
+  .sess-main{flex-wrap:wrap}
+  .s-right{width:100%; justify-content:space-between}
+  .score-n{font-size:36px}
+  .strip-btns{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast" role="status"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+"use strict";
+/* Glen Rock Cheer coverage board. Talks to Supabase (travant-tracker, gc_ tables). */
+const CFG = {
+  url: "https://fotnwsdojqlcwvnvyddx.supabase.co",
+  key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvdG53c2RvanFsY3d2bnZ5ZGR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NTQxNjYsImV4cCI6MjEwMTQzMDE2Nn0.YfMMce0UhduDVnhLwJ4kcOJRK3kWMMOZewruLiJ_tJE",
+  fn: "https://fotnwsdojqlcwvnvyddx.supabase.co/functions/v1/gc-sync"
+};
+const supa = window.supabase.createClient(CFG.url, CFG.key);
+
+const S = {
+  me: null, squads: [], roster: [], sessions: [], avail: {}, assigns: {},
+  tab: "board", filter: "all", holesOnly: false, openId: null,
+  syncResult: null, syncing: false, gate: "loading", timers: false
+};
+const shareUrl = () => location.origin + location.pathname;
+
+/* ---------- utilities ---------- */
+const $app = document.getElementById("app");
+const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uidToken = () => { const a="abcdefghjkmnpqrstuvwxyz23456789"; const r=crypto.getRandomValues(new Uint8Array(12)); let s=""; r.forEach(b=>s+=a[b%a.length]); return s; };
+function todayStr(){ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; }
+function timeRange(s){ if(s.all_day) return "All day"; const a=fmtTime(s.start_time); const b=fmtTime(s.end_time); return b?`${a}\u2013${b}`:a; }
+function fmtDate(ds){ const [y,m,d]=ds.split("-").map(Number); const js=new Date(y,m-1,d); return {dow:DOW[js.getDay()], mon:MON[m-1], day:d}; }
+const t5 = t => t ? String(t).slice(0,5) : null;
+function toMin(t){ if(!t) return null; const [h,m]=t5(t).split(":").map(Number); return h*60+m; }
+function fmtTime(t){ if(!t) return ""; const [h,m]=t5(t).split(":").map(Number); const ap=h>=12?"p":"a"; const hh=h%12===0?12:h%12; return m===0?`${hh}${ap}`:`${hh}:${String(m).padStart(2,"0")}${ap}`; }
+function overlaps(a,b){ if(a.date!==b.date||a.all_day||b.all_day) return false;
+  const as=toMin(a.start_time), ae=toMin(a.end_time)??(as+60), bs=toMin(b.start_time), be=toMin(b.end_time)??(bs+60);
+  if(as==null||bs==null) return false; return as<be && bs<ae; }
+let toastTimer=null;
+function toast(msg, err){ const t=document.getElementById("toast"); t.textContent=msg;
+  t.className="toast show"+(err?" err":""); clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove("show"), err?3500:1700); }
+function typing(){ const a=document.activeElement; return a && (a.tagName==="INPUT"||a.tagName==="SELECT"||a.tagName==="TEXTAREA"); }
+async function copyText(text, label){ try{ await navigator.clipboard.writeText(text); toast(label||"Copied"); }
+  catch(e){ toast("Couldn't copy on this browser", true); } }
+
+/* ---------- data ---------- */
+async function loadData(){
+  const today = todayStr();
+  const [sq, ro, se, av, asg] = await Promise.all([
+    supa.from("gc_squads").select("*").order("sort").order("created_at"),
+    supa.rpc("gc_roster"),
+    supa.from("gc_sessions").select("*").gte("date", today).order("date").order("start_time"),
+    supa.from("gc_availability").select("*"),
+    supa.from("gc_assignments").select("*")
+  ]);
+  for (const r of [sq,ro,se,av,asg]) if (r.error) throw new Error(r.error.message);
+  S.squads = sq.data||[]; S.roster = ro.data||[]; S.sessions = se.data||[];
+  S.avail = {}; (av.data||[]).forEach(r=>{ (S.avail[r.session_id] ??= {})[r.coach_id]=r.status; });
+  S.assigns = {}; (asg.data||[]).forEach(r=>{ (S.assigns[r.session_id] ??= []).push(r.coach_id); });
+}
+async function refresh(){ try{ await loadData(); render(); }catch(e){ toast("Couldn't reach the board", true); } }
+
+/* ---------- derived ---------- */
+const squadById = id => S.squads.find(s=>s.id===id);
+const coachById = id => S.roster.find(c=>c.id===id);
+const activeUpcoming = () => S.sessions.filter(s=>s.status==="active");
+function metrics(s){
+  const av=S.avail[s.id]||{}; const assigned=S.assigns[s.id]||[];
+  const ins=[], maybes=[], outs=[];
+  S.roster.forEach(c=>{ const v=av[c.id]; if(v==="in")ins.push(c.id); else if(v==="maybe")maybes.push(c.id); else if(v==="out")outs.push(c.id); });
+  const silent = S.roster.filter(c=>c.squad_ids.length && !av[c.id]).map(c=>c.id);
+  const needed = s.needed ?? (squadById(s.squad_id)?.needed ?? 1);
+  const filled = assigned.length;
+  let level; if(filled>=needed) level="set";
+  else if(ins.length>=needed) level="fillable";
+  else if(ins.length+maybes.length>=needed) level="thin";
+  else level="short";
+  return {av, assigned, ins, maybes, outs, silent, needed, filled, level};
+}
+const LEVEL_LABEL = {set:"Covered", fillable:"Needs assigning", thin:"Thin", short:"Short-staffed"};
+function conflictMap(){
+  const map={};
+  S.roster.forEach(c=>{
+    const mine=activeUpcoming().filter(s=>(S.assigns[s.id]||[]).includes(c.id));
+    for(let i=0;i<mine.length;i++) for(let j=i+1;j<mine.length;j++)
+      if(overlaps(mine[i],mine[j])){ (map[mine[i].id] ??= new Set()).add(c.id); (map[mine[j].id] ??= new Set()).add(c.id); }
+  });
+  return map;
+}
+function loadCounts(){
+  const m={}; S.roster.forEach(c=>m[c.id]=0);
+  activeUpcoming().forEach(s=>(S.assigns[s.id]||[]).forEach(cid=>{ if(m[cid]!=null)m[cid]++; }));
+  return m;
+}
+
+/* ---------- writes (optimistic where cheap) ---------- */
+async function setAvail(sessionId, status){
+  const me=S.me.id; const cur=(S.avail[sessionId]||{})[me];
+  const next = cur===status ? null : status;
+  (S.avail[sessionId] ??= {}); if(next) S.avail[sessionId][me]=next; else delete S.avail[sessionId][me];
+  render();
+  try{
+    if(next) { const {error}=await supa.from("gc_availability").upsert({session_id:sessionId, coach_id:me, status:next, updated_at:new Date().toISOString()}); if(error) throw error; }
+    else { const {error}=await supa.from("gc_availability").delete().eq("session_id",sessionId).eq("coach_id",me); if(error) throw error; }
+    toast("Saved");
+  }catch(e){ toast("Couldn't save, check your signal", true); refresh(); }
+}
+async function markAllIn(ids){
+  const me=S.me.id;
+  ids.forEach(id=>{ (S.avail[id] ??= {})[me]="in"; }); render();
+  try{
+    const rows=ids.map(id=>({session_id:id, coach_id:me, status:"in", updated_at:new Date().toISOString()}));
+    const {error}=await supa.from("gc_availability").upsert(rows); if(error) throw error;
+    toast(`Marked in for ${ids.length} session${ids.length===1?"":"s"}`);
+  }catch(e){ toast("Couldn't save, check your signal", true); refresh(); }
+}
+async function toggleAssign(sessionId, coachId){
+  const cur=S.assigns[sessionId]||[]; const on=cur.includes(coachId);
+  S.assigns[sessionId] = on ? cur.filter(x=>x!==coachId) : [...cur, coachId];
+  render();
+  try{
+    if(on){ const {error}=await supa.from("gc_assignments").delete().eq("session_id",sessionId).eq("coach_id",coachId); if(error) throw error; }
+    else { const {error}=await supa.from("gc_assignments").insert({session_id:sessionId, coach_id:coachId}); if(error) throw error; }
+    toast("Saved");
+  }catch(e){ toast("Couldn't save", true); refresh(); }
+}
+async function updateSquad(id, patch){
+  const sq=squadById(id); Object.assign(sq, patch); 
+  const {error}=await supa.from("gc_squads").update(patch).eq("id",id);
+  if(error){ toast("Couldn't save", true); refresh(); } else toast("Saved");
+}
+async function addSquad(){
+  const palette=["#C8102E","#14161A","#56697E","#D96C2C","#7A4FA3","#1F8A4C","#C97A0A","#3E7CB1"];
+  const row={name:"New squad", color:palette[S.squads.length%palette.length], needed:2, sort:S.squads.length+1};
+  const {error}=await supa.from("gc_squads").insert(row);
+  if(error) toast("Couldn't add squad", true); else { toast("Squad added"); await refresh(); }
+}
+async function removeSquad(id){
+  const sq=squadById(id);
+  if(!confirm(`Remove ${sq.name}? Its sessions go with it.`)) return;
+  const {error}=await supa.from("gc_squads").delete().eq("id",id);
+  if(error) toast("Couldn't remove", true); else { toast("Squad removed"); await refresh(); }
+}
+async function updateCoach(id, patch){
+  const c=coachById(id); Object.assign(c, patch);
+  const {error}=await supa.from("gc_coaches").update(patch).eq("id",id);
+  if(error){ toast("Couldn't save", true); refresh(); } else toast("Saved");
+}
+async function addCoach(){
+  const token=uidToken();
+  const {error}=await supa.from("gc_coaches").insert({name:"New coach", token, is_admin:false, squad_ids:[]});
+  if(error) toast("Couldn't add coach", true); else { toast("Coach added. Set her name, then copy her link"); await refresh(); }
+}
+async function removeCoach(id){
+  if(id===S.me.id){ toast("You can't remove yourself", true); return; }
+  const c=coachById(id);
+  if(!confirm(`Remove ${c.name}? Her link stops working.`)) return;
+  const {error}=await supa.from("gc_coaches").delete().eq("id",id);
+  if(error) toast("Couldn't remove", true); else { toast("Coach removed"); await refresh(); }
+}
+async function addSessions(form){
+  const reps=Math.max(1, Math.min(52, Number(form.repeat)||1));
+  const rows=[];
+  const [y,m,d]=form.date.split("-").map(Number);
+  for(let i=0;i<reps;i++){
+    const js=new Date(y, m-1, d+i*7);
+    rows.push({
+      squad_id:form.squadId,
+      date:`${js.getFullYear()}-${String(js.getMonth()+1).padStart(2,"0")}-${String(js.getDate()).padStart(2,"0")}`,
+      start_time:form.start||null, end_time:form.end||null, all_day:!form.start,
+      type:form.type, location:form.location||null, note:form.note||null,
+      needed:form.needed?Number(form.needed):null, source:"manual", status:"active"
+    });
+  }
+  const {error}=await supa.from("gc_sessions").insert(rows);
+  if(error) toast("Couldn't add", true); else { toast(`Added ${rows.length} session${rows.length===1?"":"s"}`); await refresh(); }
+}
+async function updateSessionNeeded(id, val){
+  const patch={needed: val==="" ? null : Math.max(1, Number(val)||1)};
+  const s=S.sessions.find(x=>x.id===id); Object.assign(s, patch);
+  const {error}=await supa.from("gc_sessions").update(patch).eq("id",id);
+  if(error){ toast("Couldn't save", true); refresh(); } else toast("Saved");
+}
+async function cancelSession(id){
+  if(!confirm("Cancel this session? Answers and assignments clear, and coaches stop seeing it.")) return;
+  const e1=(await supa.from("gc_sessions").update({status:"cancelled"}).eq("id",id)).error;
+  await supa.from("gc_availability").delete().eq("session_id",id);
+  await supa.from("gc_assignments").delete().eq("session_id",id);
+  if(e1) toast("Couldn't cancel", true); else { toast("Session cancelled"); await refresh(); }
+}
+async function deleteSession(id){
+  if(!confirm("Delete this session for good?")) return;
+  const {error}=await supa.from("gc_sessions").delete().eq("id",id);
+  if(error) toast("Couldn't delete", true); else { toast("Deleted"); await refresh(); }
+}
+async function runSync(){
+  S.syncing=true; S.syncResult=null; render();
+  try{
+    const resp=await fetch(CFG.fn, {method:"POST",
+      headers:{ "Content-Type":"application/json", "apikey":CFG.key, "Authorization":"Bearer "+CFG.key },
+      body: JSON.stringify({token: S.me.token})});
+    const data=await resp.json();
+    if(!resp.ok) throw new Error(data.error||"Sync failed");
+    S.syncResult=data;
+  }catch(e){ S.syncResult={errorTop: e.message||"Sync failed"}; }
+  S.syncing=false;
+  await refresh();
+}
+
+/* ---------- copy builders ---------- */
+function sessLine(s){
+  const d=fmtDate(s.date); const sq=squadById(s.squad_id);
+  const time=timeRange(s);
+  return `${d.dow} ${d.mon} ${d.day} · ${time} · ${sq?.name||"?"} ${s.type}${s.location?` · ${s.location}`:""}`;
+}
+function copyGaps(){
+  const lines=activeUpcoming().map(s=>({s,m:metrics(s)})).filter(r=>r.m.level!=="set")
+    .map(({s,m})=>`${sessLine(s)}: ${m.filled}/${m.needed} covered${m.level==="short"?" (not enough yeses yet)":""}`);
+  copyText(lines.length?`Open coverage:\n${lines.join("\n")}\nTap to answer: ${shareUrl()}`:"Every upcoming session is covered.", "Gaps copied. Paste in the group text");
+}
+function copyChase(){
+  const lines=S.roster.map(c=>{
+    const n=activeUpcoming().filter(s=>c.squad_ids.includes(s.squad_id) && !(S.avail[s.id]||{})[c.id]).length;
+    return n>0?`${c.name} (${n})`:null;
+  }).filter(Boolean);
+  copyText(lines.length?`Still need answers for upcoming sessions:\n${lines.join("\n")}\nTap to answer: ${shareUrl()}`:"Everyone has answered everything upcoming.", "Chase list copied");
+}
+function copyWeek(){
+  const today=todayStr(); const [y,m,d]=today.split("-").map(Number);
+  const end=new Date(y,m-1,d+7); const endStr=`${end.getFullYear()}-${String(end.getMonth()+1).padStart(2,"0")}-${String(end.getDate()).padStart(2,"0")}`;
+  const lines=activeUpcoming().filter(s=>s.date<endStr).map(sessLine);
+  copyText(lines.length?`GLEN ROCK CHEER, this week:\n${lines.join("\n")}\n${shareUrl()}`:"Nothing on the board this week.", "Week copied");
+}
+
+/* ---------- render ---------- */
+function render(){
+  if(S.gate==="loading"){ $app.innerHTML=gateHtml("Loading the board…"); return; }
+  if(S.gate==="pick"){ $app.innerHTML=pickerHtml(); return; }
+  const isAdmin=S.me.is_admin;
+  const tabs = isAdmin
+    ? `<nav class="tabs"><div class="tabs-in">
+        <button class="tab ${S.tab==="board"?"on":""}" data-act="tab" data-v="board">Board</button>
+        ${S.me.squad_ids.length?`<button class="tab ${S.tab==="mine"?"on":""}" data-act="tab" data-v="mine">My availability</button>`:""}
+        <button class="tab ${S.tab==="setup"?"on":""}" data-act="tab" data-v="setup">Setup</button>
+      </div></nav>` : "";
+  const body = !isAdmin ? coachHtml()
+    : S.tab==="setup" ? setupHtml()
+    : S.tab==="mine" ? coachHtml()
+    : boardHtml();
+  $app.innerHTML = `
+    <header class="hd"><div class="hd-row">
+      <div class="wordmark">Glen Rock<b>Cheer</b></div>
+      <div class="hd-sub">${esc(S.me.name)}</div>
+    </div></header>
+    <div class="stripe"></div><div class="stripe2"></div>
+    ${tabs}
+    <main class="wrap">${body}</main>
+    <div class="foot">${isAdmin
+      ? "Coaches only ever see their own squads and their own three buttons."
+      : `Tip: use your browser's Share menu and Add to Home Screen to keep this one tap away.<br>Not ${esc(S.me.name)}? <button class="linkbtn" data-act="switch">Switch coach</button>`}</div>`;
+}
+function gateHtml(msg){
+  return `<div class="gate"><div class="wordmark">Glen Rock<b>Cheer</b></div>
+    <div class="stripe" style="max-width:120px;margin:14px auto"></div>
+    <p>${esc(msg)}</p></div>`;
+}
+function pickerHtml(){
+  const coaches=S.roster.filter(c=>!c.is_admin).sort((a,b)=>a.name.localeCompare(b.name));
+  return `<div class="gate"><div class="wordmark">Glen Rock<b>Cheer</b></div>
+    <div class="stripe" style="max-width:120px;margin:14px auto"></div>
+    <h2 class="cond" style="font-size:24px;margin:20px 0 4px">Who are you?</h2>
+    <p>Tap your name once. This phone remembers you after that.</p>
+    ${coaches.length
+      ? `<div class="pickgrid">${coaches.map(c=>`<button class="pickbtn" data-act="pick" data-id="${c.id}">${esc(c.name)}</button>`).join("")}</div>`
+      : `<p>Germaine hasn't added the coaches yet. Check back once she has.</p>`}
+  </div>`;
+}
+
+/* coach view (also admin "Mine" tab) */
+function coachHtml(){
+  const mine=activeUpcoming().filter(s=>S.me.squad_ids.includes(s.squad_id));
+  if(!S.me.squad_ids.length) return `<div class="empty"><h2>No squad yet</h2><p>Germaine hasn't put you on a squad. Once she does, your schedule shows up here.</p></div>`;
+  if(!mine.length) return `<div class="empty"><h2>Nothing scheduled</h2><p>Your squad has no upcoming sessions on the board yet.</p></div>`;
+  const unanswered=mine.filter(s=>!(S.avail[s.id]||{})[S.me.id]);
+  let html=`<div class="me-head"><div><h2>Your schedule</h2>
+    <p class="${unanswered.length?"due":""}">${unanswered.length
+      ? `${unanswered.length} session${unanswered.length===1?"":"s"} need${unanswered.length===1?"s":""} your answer`
+      : "You've answered everything upcoming"}</p></div>
+    ${unanswered.length>1?`<button class="btn btn-red" data-act="allin">I'm in for all ${unanswered.length}</button>`:""}
+  </div>`;
+  let prevDate=null; const today=todayStr();
+  mine.forEach(s=>{
+    if(s.date!==prevDate){ const d=fmtDate(s.date);
+      html+=`<div class="day ${s.date===today?"today":""}"><span class="day-dow">${s.date===today?"Today":d.dow}</span><span class="day-date">${d.mon} ${d.day}</span><span class="day-rule"></span></div>`;
+      prevDate=s.date; }
+    const sq=squadById(s.squad_id); const cur=(S.avail[s.id]||{})[S.me.id]||"";
+    const assigned=(S.assigns[s.id]||[]).includes(S.me.id);
+    const others=(S.assigns[s.id]||[]).filter(id=>id!==S.me.id).map(id=>coachById(id)?.name).filter(Boolean);
+    html+=`<div class="acard ${cur?"answered":"due"}">
+      <div class="a-top"><div>
+        <div class="s-title"><i class="dot" style="background:${esc(sq?.color||"#888")}"></i>
+          <span class="s-squad">${esc(sq?.name||"?")}</span><span class="s-type">${esc(s.type)}</span></div>
+        <div class="s-sub"><span class="mono">${timeRange(s)}</span>
+          ${s.location?`<span>${esc(s.location)}</span>`:""}</div>
+        ${s.note?`<div class="note">${esc(s.note)}</div>`:""}
+      </div>
+      ${assigned?`<div><span class="working">You're working this</span>${others.length?`<div class="s-sub" style="margin-top:5px">with ${esc(others.join(", "))}</div>`:""}</div>`:""}
+      </div>
+      <div class="tri">
+        <button class="tri-b ${cur==="in"?"on-in":""}" data-act="av" data-id="${s.id}" data-v="in">In</button>
+        <button class="tri-b ${cur==="maybe"?"on-maybe":""}" data-act="av" data-id="${s.id}" data-v="maybe">Maybe</button>
+        <button class="tri-b ${cur==="out"?"on-out":""}" data-act="av" data-id="${s.id}" data-v="out">Out</button>
+      </div></div>`;
+  });
+  return html;
+}
+
+/* admin board */
+function boardHtml(){
+  const all=activeUpcoming();
+  if(!all.length) return `<div class="empty"><h2>Nothing on the board</h2><p>Paste your TeamSnap calendar links in Setup and hit Sync, or add sessions by hand.</p><button class="btn btn-red" data-act="tab" data-v="setup">Go to Setup</button></div>`;
+  const totals={};
+  all.forEach(s=>{ const l=metrics(s).level; totals[l]=(totals[l]||0)+1; });
+  const conflicts=conflictMap(); const loads=loadCounts();
+  const rows=all.filter(s=>S.filter==="all"||s.squad_id===S.filter)
+    .map(s=>({s,m:metrics(s)})).filter(r=>!S.holesOnly||r.m.level!=="set");
+  let html=`<div class="strip">
+    <div class="score"><span class="score-n" style="color:var(--ok)">${totals.set||0}</span><span class="score-l">Covered</span></div>
+    <div class="score"><span class="score-n" style="color:var(--warn)">${(totals.fillable||0)+(totals.thin||0)}</span><span class="score-l">Need assigning</span></div>
+    <div class="score"><span class="score-n" style="color:var(--gap)">${totals.short||0}</span><span class="score-l">Short-staffed</span></div>
+    <div class="strip-btns">
+      <button class="btn btn-ghost" data-act="copygaps">Copy gaps</button>
+      <button class="btn btn-ghost" data-act="copychase">Copy chase list</button>
+      <button class="btn btn-ghost" data-act="copyweek">Copy week</button>
+    </div></div>
+  <div class="filters"><div class="chips">
+    <button class="chip ${S.filter==="all"?"on":""}" data-act="filter" data-v="all">All squads</button>
+    ${S.squads.map(sq=>`<button class="chip ${S.filter===sq.id?"on":""}" data-act="filter" data-v="${sq.id}"><i class="dot" style="background:${esc(sq.color)}"></i>${esc(sq.name)}</button>`).join("")}
+  </div>
+  <label class="tgl"><input type="checkbox" data-act="holes" ${S.holesOnly?"checked":""}><span>Only show holes</span></label></div>`;
+  if(!rows.length) html+=`<p class="mutetxt">Nothing matches that filter.</p>`;
+  let prevDate=null; const today=todayStr();
+  rows.forEach(({s,m})=>{
+    if(s.date!==prevDate){ const d=fmtDate(s.date);
+      html+=`<div class="day ${s.date===today?"today":""}"><span class="day-dow">${s.date===today?"Today":d.dow}</span><span class="day-date">${d.mon} ${d.day}</span><span class="day-rule"></span></div>`;
+      prevDate=s.date; }
+    const sq=squadById(s.squad_id); const open=S.openId===s.id;
+    const confNames=conflicts[s.id]?[...conflicts[s.id]].map(id=>coachById(id)?.name).filter(Boolean):[];
+    let slots="";
+    for(let i=0;i<Math.min(m.needed,8);i++){
+      slots += i<m.filled
+        ? `<i class="slot fill" style="background:${esc(sq?.color||"#888")}"></i>`
+        : `<i class="slot open ${m.level==="short"?"short":(m.level!=="set"?"warn":"")}"></i>`;
+    }
+    html+=`<article class="sess lvl-${m.level}">
+      <button class="sess-main" data-act="open" data-id="${s.id}" aria-expanded="${open}">
+        <div class="s-time">${s.all_day?`<b>All</b><span>day</span>`:`<b>${fmtTime(s.start_time)}</b><span>${fmtTime(s.end_time)||""}</span>`}</div>
+        <div class="s-mid">
+          <div class="s-title"><i class="dot" style="background:${esc(sq?.color||"#888")}"></i>
+            <span class="s-squad">${esc(sq?.name||"?")}</span><span class="s-type">${esc(s.type)}</span>
+            <span class="lvl-tag lt-${m.level}">${LEVEL_LABEL[m.level]}</span></div>
+          <div class="s-sub">${s.location?`<span>${esc(s.location)}</span>`:""}
+            <span>${m.ins.length} in · ${m.maybes.length} maybe · ${m.silent.length} silent</span>
+            ${confNames.length?`<span class="s-conflict">Double-booked: ${esc(confNames.join(", "))}</span>`:""}</div>
+        </div>
+        <div class="s-right"><span class="slots">${slots}</span><span class="s-count">${m.filled}/${m.needed}</span></div>
+      </button>
+      ${open?assignPanel(s,m,loads):""}
+    </article>`;
+  });
+  return html;
+}
+function assignPanel(s,m,loads){
+  const sq=squadById(s.squad_id);
+  const order=c=>{
+    const v=m.av[c.id]; const avScore=v==="in"?0:v==="maybe"?1:!v?2:3;
+    return [avScore, c.squad_ids.includes(s.squad_id)?0:1, loads[c.id]||0, c.name];
+  };
+  const coaches=[...S.roster].sort((a,b)=>{ const A=order(a),B=order(b);
+    for(let i=0;i<4;i++){ if(A[i]<B[i])return -1; if(A[i]>B[i])return 1; } return 0; });
+  const busy=id=>activeUpcoming().some(o=>o.id!==s.id && overlaps(o,s) && (S.assigns[o.id]||[]).includes(id));
+  let html=`<div class="sess-open"><p class="open-hint">Tap a coach to put her on this session or take her off. She answers from her own link.</p><div class="cgrid">`;
+  coaches.forEach(c=>{
+    const v=m.av[c.id]||""; const on=m.assigned.includes(c.id);
+    const home=c.squad_ids.includes(s.squad_id);
+    html+=`<button class="cpick av-${v||"none"} ${on?"assigned":""}" data-act="assign" data-id="${s.id}" data-cid="${c.id}">
+      <span class="cp-name">${esc(c.name)}${home?`<i class="star" title="Home squad">★</i>`:""}<span class="badge">${loads[c.id]||0}</span></span>
+      <span class="cp-av">${v==="in"?"In":v==="maybe"?"Maybe":v==="out"?"Out":"—"}</span></button>`;
+  });
+  html+=`</div>`;
+  const assignedBusy=m.assigned.filter(busy).map(id=>coachById(id)?.name).filter(Boolean);
+  if(assignedBusy.length) html+=`<div class="warnline">Heads up: ${esc(assignedBusy.join(", "))} ${assignedBusy.length===1?"is":"are"} also assigned to something that overlaps.</div>`;
+  if(m.silent.length) html+=`<div class="note">Hasn't answered: ${esc(m.silent.map(id=>coachById(id)?.name).join(", "))}</div>`;
+  if(s.note) html+=`<div class="note">${esc(s.note)}</div>`;
+  html+=`</div>`;
+  return html;
+}
+
+/* setup */
+function setupHtml(){
+  const link=c=>`${location.origin}${location.pathname}?c=${c.token||""}`;
+  let sync="";
+  if(S.syncResult){
+    if(S.syncResult.errorTop) sync=`<div class="syncbox"><div class="syncerr">${esc(S.syncResult.errorTop)}</div></div>`;
+    else if(S.syncResult.note) sync=`<div class="syncbox"><div class="mutetxt">${esc(S.syncResult.note)}</div></div>`;
+    else sync=`<div class="syncbox">${(S.syncResult.squads||[]).map(r=>r.error
+      ? `<div class="syncerr">${esc(r.squad)}: ${esc(r.error)}</div>`
+      : `<div><b>${esc(r.squad)}</b>: ${r.added} added, ${r.updated} moved, ${r.cancelled} cancelled, ${r.unchanged} unchanged</div>`).join("")}
+      <div class="mutetxt">Moved and cancelled sessions had their answers cleared, so they go back out as unanswered.</div></div>`;
+  }
+  const today=todayStr();
+  const listSessions=[...S.sessions].sort((a,b)=>a.date===b.date?(t5(a.start_time)||"").localeCompare(t5(b.start_time)||""):a.date<b.date?-1:1);
+  return `
+  <div class="panel"><h2>TeamSnap sync</h2>
+    <p class="hint">In TeamSnap, open each squad's schedule and choose Sync other calendar. TeamSnap emails you one link per team. Paste each squad's link below, then press Sync. Re-press it any time the TeamSnap schedule changes.</p>
+    <button class="btn btn-red" data-act="sync" ${S.syncing?"disabled":""}>${S.syncing?"Syncing…":"Sync from TeamSnap now"}</button>
+    ${sync}</div>
+
+  <div class="panel"><h2>Squads</h2>
+    <div class="rows">${S.squads.map(sq=>`
+      <div class="erow">
+        <select class="inline" style="width:auto" data-act="sqcolor" data-id="${sq.id}">
+          ${[["#C8102E","Red"],["#14161A","Black"],["#56697E","Steel"],["#D96C2C","Ember"],["#7A4FA3","Purple"],["#1F8A4C","Green"],["#C97A0A","Gold"],["#3E7CB1","Blue"]].map(([c,n])=>`<option value="${c}" ${sq.color===c?"selected":""}>${n}</option>`).join("")}
+        </select>
+        <input class="inline" value="${esc(sq.name)}" data-act="sqname" data-id="${sq.id}" aria-label="Squad name">
+        <label class="mini">needs <input type="number" min="1" max="8" value="${sq.needed}" data-act="sqneeded" data-id="${sq.id}"></label>
+        <input class="inline" style="flex:2 1 220px" placeholder="TeamSnap calendar link" value="${esc(sq.ical_url||"")}" data-act="squrl" data-id="${sq.id}" aria-label="TeamSnap calendar link">
+        <button class="x" data-act="sqdel" data-id="${sq.id}">Remove</button>
+      </div>`).join("")}</div>
+    <button class="btn btn-ghost" data-act="sqadd">Add squad</button></div>
+
+  <div class="panel"><h2>Coaches</h2>
+    <p class="hint">One board link works for everyone: post it in the group text, and the first open asks each coach to tap her name. Her phone remembers her after that. Copy her link below makes a private link with her name already baked in, good for texting one person directly. The group thread only ever gets the board link. ★ means home squad; the assign list puts home-squad coaches first.</p>
+    <p style="margin:0 0 13px"><button class="btn btn-sm" data-act="boardlink">Copy the board link</button></p>
+    <div class="rows">${S.roster.map(c=>`
+      <div class="erow">
+        <input class="inline" value="${esc(c.name)}" data-act="cname" data-id="${c.id}" aria-label="Coach name">
+        <div class="sqpick">${S.squads.map(sq=>{
+          const on=c.squad_ids.includes(sq.id);
+          return `<button class="chip chip-sm ${on?"on":""}" ${on?`style="border-color:${esc(sq.color)};color:${esc(sq.color)}"`:""} data-act="csquad" data-id="${c.id}" data-sq="${sq.id}">${esc(sq.name)}</button>`;
+        }).join("")}</div>
+        <label class="tgl" style="font-size:12px"><input type="checkbox" ${c.is_admin?"checked":""} ${c.id===S.me.id?"disabled":""} data-act="cadmin" data-id="${c.id}"><span>Admin</span></label>
+        <button class="btn btn-sm" data-act="clink" data-id="${c.id}">Copy her link</button>
+        ${c.id===S.me.id?`<span class="badge">you</span>`:`<button class="x" data-act="cdel" data-id="${c.id}">Remove</button>`}
+      </div>`).join("")}</div>
+    <button class="btn btn-ghost" data-act="cadd">Add coach</button></div>
+
+  <div class="panel"><h2>Add sessions by hand</h2>
+    <p class="hint">For anything that isn't in TeamSnap. Time changes come from TeamSnap through sync; for a manual session that moves, cancel it and add it again so nobody holds a stale yes.</p>
+    <div class="form">
+      <label class="field"><span>Date</span><input type="date" id="f-date" value="${today}"></label>
+      <label class="field"><span>Start</span><input type="time" id="f-start" value="16:00"></label>
+      <label class="field"><span>End</span><input type="time" id="f-end" value="18:00"></label>
+      <label class="field"><span>Squad</span><select id="f-squad">${S.squads.map(sq=>`<option value="${sq.id}">${esc(sq.name)}</option>`).join("")}</select></label>
+      <label class="field"><span>Type</span><select id="f-type">${["Practice","Game","Competition","Camp","Tryouts","Event"].map(t=>`<option>${t}</option>`).join("")}</select></label>
+      <label class="field"><span>Coaches needed</span><input type="number" id="f-needed" min="1" max="8" placeholder="squad default"></label>
+      <label class="field"><span>Location</span><input type="text" id="f-loc" placeholder="Main gym"></label>
+      <label class="field"><span>Repeat weekly ×</span><input type="number" id="f-repeat" min="1" max="52" value="1"></label>
+      <label class="field wide"><span>Note</span><input type="text" id="f-note" placeholder="Anything the coaches should know"></label>
+    </div>
+    <button class="btn btn-red" data-act="addsess">Add to board</button></div>
+
+  <div class="panel"><h2>Upcoming sessions (${listSessions.length})</h2>
+    <p class="hint">Past sessions drop off this list but stay saved, so who worked what is always on record.</p>
+    <div class="rows">${listSessions.map(s=>{
+      const d=fmtDate(s.date); const sq=squadById(s.squad_id);
+      return `<div class="erow ${s.status==="cancelled"?"cancelled":""}">
+        <span class="mono">${d.dow} ${d.mon} ${d.day}</span>
+        <span class="mono">${timeRange(s)}</span>
+        <span class="cond" style="color:${esc(sq?.color||"#888")};font-weight:600">${esc(sq?.name||"?")}</span>
+        <span class="mutetxt">${esc(s.type)}${s.location?` · ${esc(s.location)}`:""}${s.source==="teamsnap"?" · TeamSnap":""}</span>
+        ${s.status==="cancelled"?`<span class="cancel-tag">Cancelled</span>`:
+          `<label class="mini">needs <input type="number" min="1" max="8" value="${s.needed??""}" placeholder="${squadById(s.squad_id)?.needed??1}" data-act="sneeded" data-id="${s.id}"></label>
+           <button class="x" data-act="scancel" data-id="${s.id}">Cancel</button>`}
+        <button class="x" data-act="sdel" data-id="${s.id}">Delete</button>
+      </div>`;}).join("")||`<p class="mutetxt">Nothing yet.</p>`}</div></div>`;
+}
+
+/* ---------- events ---------- */
+$app.addEventListener("click", e=>{
+  const el=e.target.closest("[data-act]"); if(!el) return;
+  const act=el.dataset.act, id=el.dataset.id;
+  if(act==="tab"){ S.tab=el.dataset.v; S.openId=null; render(); }
+  else if(act==="filter"){ S.filter=el.dataset.v; render(); }
+  else if(act==="open"){ S.openId=S.openId===id?null:id; render(); }
+  else if(act==="av") setAvail(id, el.dataset.v);
+  else if(act==="allin"){
+    const ids=activeUpcoming().filter(s=>S.me.squad_ids.includes(s.squad_id)&&!(S.avail[s.id]||{})[S.me.id]).map(s=>s.id);
+    if(ids.length) markAllIn(ids);
+  }
+  else if(act==="assign") toggleAssign(id, el.dataset.cid);
+  else if(act==="copygaps") copyGaps();
+  else if(act==="copychase") copyChase();
+  else if(act==="copyweek") copyWeek();
+  else if(act==="sync") runSync();
+  else if(act==="sqadd") addSquad();
+  else if(act==="sqdel") removeSquad(id);
+  else if(act==="cadd") addCoach();
+  else if(act==="cdel") removeCoach(id);
+  else if(act==="boardlink") copyText(shareUrl(), "Board link copied. Safe for the group thread");
+  else if(act==="pick"){ const c=S.roster.find(x=>x.id===id && !x.is_admin);
+    if(c){ try{ localStorage.setItem("gc_coach", c.id); }catch(err){} enter({...c, token:null}); } }
+  else if(act==="switch"){
+    try{ localStorage.removeItem("gc_coach"); localStorage.removeItem("gc_token"); }catch(err){}
+    history.replaceState(null, "", location.pathname);
+    S.me=null; S.gate="pick";
+    supa.rpc("gc_roster").then(({data})=>{ S.roster=data||[]; render(); });
+    render(); }
+  else if(act==="clink"){ const c=coachById(id);
+    copyText(`${location.origin}${location.pathname}?c=${c.token||""}`, `Link copied. Text it to ${c.name}`); }
+  else if(act==="csquad"){ const c=coachById(id); const sq=el.dataset.sq;
+    const next=c.squad_ids.includes(sq)?c.squad_ids.filter(x=>x!==sq):[...c.squad_ids, sq];
+    updateCoach(id,{squad_ids:next}); render(); }
+  else if(act==="scancel") cancelSession(id);
+  else if(act==="sdel") deleteSession(id);
+  else if(act==="addsess"){
+    const g=x=>document.getElementById(x).value;
+    if(!g("f-date")||!g("f-squad")){ toast("Pick a date and a squad", true); return; }
+    addSessions({date:g("f-date"), start:g("f-start"), end:g("f-end"), squadId:g("f-squad"),
+      type:g("f-type"), needed:g("f-needed"), location:g("f-loc"), repeat:g("f-repeat"), note:g("f-note")});
+  }
+});
+$app.addEventListener("change", e=>{
+  const el=e.target.closest("[data-act]"); if(!el) return;
+  const act=el.dataset.act, id=el.dataset.id, v=el.value;
+  if(act==="holes"){ S.holesOnly=el.checked; render(); }
+  else if(act==="sqcolor"){ updateSquad(id,{color:v}); render(); }
+  else if(act==="sqneeded") updateSquad(id,{needed:Math.max(1,Number(v)||1)});
+  else if(act==="sneeded") updateSessionNeeded(id, v);
+  else if(act==="cadmin"){ if(id===S.me.id){ toast("You can't take admin off yourself", true); render(); return; }
+    updateCoach(id,{is_admin:el.checked}); }
+});
+$app.addEventListener("focusout", e=>{
+  const el=e.target.closest("[data-act]"); if(!el) return;
+  const act=el.dataset.act, id=el.dataset.id, v=el.value;
+  if(act==="sqname"){ if(v.trim()) updateSquad(id,{name:v.trim()}); }
+  else if(act==="squrl") updateSquad(id,{ical_url:v.trim()||null});
+  else if(act==="cname"){ if(v.trim()) updateCoach(id,{name:v.trim()}); }
+});
+
+/* ---------- boot ---------- */
+function startTimers(){
+  if(S.timers) return; S.timers=true;
+  setInterval(()=>{ if(S.gate==="ok" && !typing() && !S.syncing) refresh(); }, 30000);
+  document.addEventListener("visibilitychange", ()=>{ if(S.gate==="ok" && !document.hidden && !typing()) refresh(); });
+}
+async function enter(me){
+  S.me=me; S.tab=me.is_admin?"board":"mine";
+  try{ await loadData(); }catch(e){ $app.innerHTML=gateHtml("Can't reach the board right now. Check your signal and reload."); return; }
+  S.gate="ok"; render(); startTimers();
+}
+(async function boot(){
+  render();
+  const params=new URLSearchParams(location.search);
+  const urlToken=params.get("c");
+  try{
+    if(urlToken){
+      const {data, error}=await supa.rpc("gc_login",{t:urlToken});
+      if(error) throw error;
+      if(data && data.length){
+        try{ localStorage.setItem("gc_token", urlToken); }catch(e){}
+        return enter({...data[0], token:urlToken});
+      }
+    }
+    let saved=null; try{ saved=localStorage.getItem("gc_token"); }catch(e){}
+    if(saved){
+      const {data}=await supa.rpc("gc_login",{t:saved});
+      if(data && data.length) return enter({...data[0], token:saved});
+      try{ localStorage.removeItem("gc_token"); }catch(e){}
+    }
+    const {data: roster, error: rErr}=await supa.rpc("gc_roster");
+    if(rErr) throw rErr;
+    S.roster=roster||[];
+    let cid=null; try{ cid=localStorage.getItem("gc_coach"); }catch(e){}
+    const c=cid && S.roster.find(x=>x.id===cid && !x.is_admin);
+    if(c) return enter({...c, token:null});
+    S.gate="pick"; render();
+  }catch(e){ $app.innerHTML=gateHtml("Can't reach the board right now. Check your signal and reload."); }
+})();
+</script>
+</body>
+</html>
