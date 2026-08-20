@@ -141,7 +141,6 @@ input:focus,select:focus{border-color:var(--ink); outline:none}
 .cp-av{font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase;
   letter-spacing:.05em; color:var(--slate); flex:none}
 .av-in .cp-av{color:var(--ok); font-weight:600}
-.av-maybe .cp-av{color:var(--warn); font-weight:600}
 .av-out .cp-av{color:var(--gap)}
 .star{color:var(--warn); font-size:11px}
 .badge{font-family:'IBM Plex Mono',monospace; font-size:10px; background:var(--snow);
@@ -169,7 +168,6 @@ input:focus,select:focus{border-color:var(--ink); outline:none}
 .tri-b:last-child{border-right:none}
 .tri-b:hover{background:var(--snow); color:var(--ink)}
 .tri-b.on-in{background:var(--ok); color:#fff}
-.tri-b.on-maybe{background:var(--warn); color:#fff}
 .tri-b.on-out{background:var(--ink); color:#fff}
 
 /* panels & setup */
@@ -310,15 +308,15 @@ const coachById = id => S.roster.find(c=>c.id===id);
 const activeUpcoming = () => S.sessions.filter(s=>s.status==="active");
 function metrics(s){
   const av=S.avail[s.id]||{}; const assigned=S.assigns[s.id]||[];
-  const ins=[], maybes=[], outs=[];
-  S.roster.forEach(c=>{ const v=av[c.id]; if(v==="in")ins.push(c.id); else if(v==="maybe")maybes.push(c.id); else if(v==="out")outs.push(c.id); });
-  const silent = S.roster.filter(c=>c.squad_ids.length && !av[c.id]).map(c=>c.id);
+  const ins=[], outs=[];
+  S.roster.forEach(c=>{ const v=av[c.id]; if(v==="in")ins.push(c.id); else if(v==="out")outs.push(c.id); });
+  const silent = S.roster.filter(c=>c.squad_ids.length && av[c.id]!=="in" && av[c.id]!=="out").map(c=>c.id);
   const needed = s.needed ?? (squadById(s.squad_id)?.needed ?? 1);
   const filled = assigned.length;
   let level; if(filled>=needed) level="set";
   else if(filled>=1) level="thin";
   else level="empty";
-  return {av, assigned, ins, maybes, outs, silent, needed, filled, level};
+  return {av, assigned, ins, outs, silent, needed, filled, level};
 }
 const LEVEL_LABEL = {set:"Covered", thin:"Thin", empty:"Nobody yet"};
 function conflictMap(){
@@ -561,7 +559,6 @@ function coachHtml(){
       </div>
       <div class="tri">
         <button class="tri-b ${cur==="in"?"on-in":""}" data-act="av" data-id="${s.id}" data-v="in">In</button>
-        <button class="tri-b ${cur==="maybe"?"on-maybe":""}" data-act="av" data-id="${s.id}" data-v="maybe">Maybe</button>
         <button class="tri-b ${cur==="out"?"on-out":""}" data-act="av" data-id="${s.id}" data-v="out">Out</button>
       </div></div>`;
   });
@@ -614,7 +611,7 @@ function boardHtml(){
             <span class="s-squad">${esc(sq?.name||"?")}</span><span class="s-type t-${esc(s.type.toLowerCase())}">${esc(s.type)}</span>
             <span class="lvl-tag lt-${m.level}">${LEVEL_LABEL[m.level]}</span></div>
           <div class="s-sub">${s.location?`<span>${esc(s.location)}</span>`:""}
-            <span>${m.ins.length} in · ${m.maybes.length} maybe · ${m.outs.length} out · ${m.silent.length} silent</span>
+            <span>${m.ins.length} in · ${m.outs.length} out · ${m.silent.length} silent</span>
             ${confNames.length?`<span class="s-conflict">Double-booked: ${esc(confNames.join(", "))}</span>`:""}</div>
         </div>
         <div class="s-right"><span class="slots">${slots}</span><span class="s-count">${m.filled}/${m.needed}</span></div>
@@ -627,7 +624,7 @@ function boardHtml(){
 function assignPanel(s,m,loads){
   const sq=squadById(s.squad_id);
   const order=c=>{
-    const v=m.av[c.id]; const avScore=v==="in"?0:v==="maybe"?1:!v?2:3;
+    const v=m.av[c.id]; const avScore=v==="in"?0:v!=="out"?1:2;
     return [avScore, c.squad_ids.includes(s.squad_id)?0:1, loads[c.id]||0, c.name];
   };
   const coaches=[...S.roster].sort((a,b)=>{ const A=order(a),B=order(b);
@@ -639,7 +636,7 @@ function assignPanel(s,m,loads){
     const home=c.squad_ids.includes(s.squad_id);
     html+=`<button class="cpick av-${v||"none"} ${on?"assigned":""}" data-act="assign" data-id="${s.id}" data-cid="${c.id}">
       <span class="cp-name">${esc(c.name)}${home?`<i class="star" title="Home squad">★</i>`:""}<span class="badge">${loads[c.id]||0}</span></span>
-      <span class="cp-av">${v==="in"?"In":v==="maybe"?"Maybe":v==="out"?"Out":"—"}</span></button>`;
+      <span class="cp-av">${v==="in"?"In":v==="out"?"Out":"\u2013"}</span></button>`;
   });
   html+=`</div>`;
   const assignedBusy=m.assigned.filter(busy).map(id=>coachById(id)?.name).filter(Boolean);
