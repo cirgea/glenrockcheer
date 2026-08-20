@@ -84,9 +84,10 @@ input:focus,select:focus{border-color:var(--ink); outline:none}
 .tgl input{width:16px; height:16px; padding:0}
 
 /* day bars */
-.day{display:flex; align-items:center; gap:10px; margin:20px 0 8px}
-.day-dow{font-family:'Barlow Condensed',sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.12em; font-size:15px}
-.day-date{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--slate)}
+.day{display:flex; align-items:baseline; gap:10px; margin:22px 0 8px; position:sticky; top:0;
+  background:var(--snow); z-index:5; padding:9px 0 7px; border-bottom:1px solid var(--line)}
+.day-dow{font-family:'Barlow Condensed',sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.1em; font-size:20px}
+.day-date{font-family:'IBM Plex Mono',monospace; font-size:13.5px; color:var(--ink); font-weight:500}
 .day-rule{flex:1; height:1px; background:var(--line)}
 .day.today .day-dow{color:var(--red)}
 
@@ -94,8 +95,8 @@ input:focus,select:focus{border-color:var(--ink); outline:none}
 .sess{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--line);
   border-radius:8px; margin-bottom:8px; overflow:hidden}
 .lvl-set{border-left-color:var(--ok)}
-.lvl-fillable,.lvl-thin{border-left-color:var(--warn)}
-.lvl-short{border-left-color:var(--gap)}
+.lvl-thin{border-left-color:var(--warn)}
+.lvl-empty{border-left-color:var(--gap)}
 .sess-main{width:100%; display:flex; align-items:center; gap:13px; padding:13px 14px;
   background:none; border:none; color:inherit; text-align:left}
 .sess-main:hover{background:#FBFAF8}
@@ -107,6 +108,9 @@ input:focus,select:focus{border-color:var(--ink); outline:none}
 .s-squad{font-family:'Barlow Condensed',sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:.06em; font-size:18px}
 .s-type{font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--slate);
   border:1px solid var(--line); border-radius:4px; padding:2px 7px}
+.s-type.t-game{background:var(--red); border-color:var(--red); color:#fff; font-weight:600}
+.s-type.t-competition{background:var(--ink); border-color:var(--ink); color:#fff; font-weight:600}
+.legend{margin:12px 0 0; font-size:11.5px; color:var(--slate); border-top:1px solid var(--line); padding-top:9px}
 .s-sub{display:flex; gap:12px; flex-wrap:wrap; color:var(--slate); font-size:12.5px; margin-top:3px}
 .s-conflict{color:var(--gap); font-weight:500}
 .s-right{display:flex; align-items:center; gap:9px; flex:none}
@@ -120,8 +124,8 @@ input:focus,select:focus{border-color:var(--ink); outline:none}
 .lvl-tag{font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; font-weight:600;
   border-radius:4px; padding:2px 7px}
 .lt-set{color:var(--ok); background:var(--ok-bg)}
-.lt-fillable,.lt-thin{color:var(--warn); background:var(--warn-bg)}
-.lt-short{color:var(--gap); background:var(--gap-bg)}
+.lt-thin{color:var(--warn); background:var(--warn-bg)}
+.lt-empty{color:var(--gap); background:var(--gap-bg)}
 
 /* expanded assign panel */
 .sess-open{border-top:1px solid var(--line); padding:12px 14px; background:#FBFAF8}
@@ -290,6 +294,16 @@ async function loadData(){
 }
 async function refresh(){ try{ await loadData(); render(); }catch(e){ toast("Couldn't reach the board", true); } }
 
+function showNote(s){
+  if(!s.note) return false;
+  const sq=squadById(s.squad_id); const name=(sq?.name||"").toLowerCase();
+  const sing=name.endsWith("s")?name.slice(0,-1):name;
+  let r=s.note.toLowerCase();
+  if(name) r=r.split(name).join("");
+  if(sing) r=r.split(sing).join("");
+  r=r.replace(/cheer|practice|game|event|competition|20\d\d/g,"").replace(/[^a-z]/g,"");
+  return r.length>0;
+}
 /* ---------- derived ---------- */
 const squadById = id => S.squads.find(s=>s.id===id);
 const coachById = id => S.roster.find(c=>c.id===id);
@@ -302,12 +316,11 @@ function metrics(s){
   const needed = s.needed ?? (squadById(s.squad_id)?.needed ?? 1);
   const filled = assigned.length;
   let level; if(filled>=needed) level="set";
-  else if(ins.length>=needed) level="fillable";
-  else if(ins.length+maybes.length>=needed) level="thin";
-  else level="short";
+  else if(filled>=1) level="thin";
+  else level="empty";
   return {av, assigned, ins, maybes, outs, silent, needed, filled, level};
 }
-const LEVEL_LABEL = {set:"Covered", fillable:"Needs assigning", thin:"Thin", short:"Short-staffed"};
+const LEVEL_LABEL = {set:"Covered", thin:"Thin", empty:"Nobody yet"};
 function conflictMap(){
   const map={};
   S.roster.forEach(c=>{
@@ -328,20 +341,28 @@ async function setAvail(sessionId, status){
   const me=S.me.id; const cur=(S.avail[sessionId]||{})[me];
   const next = cur===status ? null : status;
   (S.avail[sessionId] ??= {}); if(next) S.avail[sessionId][me]=next; else delete S.avail[sessionId][me];
+  const wasOn=(S.assigns[sessionId]||[]).includes(me);
+  if(next==="in" && !wasOn) S.assigns[sessionId]=[...(S.assigns[sessionId]||[]), me];
+  if(next!=="in" && wasOn) S.assigns[sessionId]=(S.assigns[sessionId]||[]).filter(x=>x!==me);
   render();
   try{
     if(next) { const {error}=await supa.from("gc_availability").upsert({session_id:sessionId, coach_id:me, status:next, updated_at:new Date().toISOString()}); if(error) throw error; }
     else { const {error}=await supa.from("gc_availability").delete().eq("session_id",sessionId).eq("coach_id",me); if(error) throw error; }
-    toast("Saved");
+    if(next==="in"){ const {error}=await supa.from("gc_assignments").upsert({session_id:sessionId, coach_id:me}); if(error) throw error; }
+    else { const {error}=await supa.from("gc_assignments").delete().eq("session_id",sessionId).eq("coach_id",me); if(error) throw error; }
+    toast(next==="in" ? "You're on it" : "Saved");
   }catch(e){ toast("Couldn't save, check your signal", true); refresh(); }
 }
 async function markAllIn(ids){
   const me=S.me.id;
   ids.forEach(id=>{ (S.avail[id] ??= {})[me]="in"; }); render();
+  ids.forEach(id=>{ if(!(S.assigns[id]||[]).includes(me)) S.assigns[id]=[...(S.assigns[id]||[]), me]; });
   try{
     const rows=ids.map(id=>({session_id:id, coach_id:me, status:"in", updated_at:new Date().toISOString()}));
     const {error}=await supa.from("gc_availability").upsert(rows); if(error) throw error;
-    toast(`Marked in for ${ids.length} session${ids.length===1?"":"s"}`);
+    const arows=ids.map(id=>({session_id:id, coach_id:me}));
+    const {error: e2}=await supa.from("gc_assignments").upsert(arows); if(e2) throw e2;
+    toast(`You're on ${ids.length} session${ids.length===1?"":"s"}`);
   }catch(e){ toast("Couldn't save, check your signal", true); refresh(); }
 }
 async function toggleAssign(sessionId, coachId){
@@ -445,7 +466,8 @@ function sessLine(s){
 }
 function copyGaps(){
   const lines=activeUpcoming().map(s=>({s,m:metrics(s)})).filter(r=>r.m.level!=="set")
-    .map(({s,m})=>`${sessLine(s)}: ${m.filled}/${m.needed} covered${m.level==="short"?" (not enough yeses yet)":""}`);
+    .sort((a,b)=>(a.m.level==="empty"?0:1)-(b.m.level==="empty"?0:1))
+    .map(({s,m})=>`${sessLine(s)}: ${m.level==="empty"?"NOBODY yet":`${m.filled} on it, target ${m.needed}`}`);
   copyText(lines.length?`Open coverage:\n${lines.join("\n")}\nTap to answer: ${shareUrl()}`:"Every upcoming session is covered.", "Gaps copied. Paste in the group text");
 }
 function copyChase(){
@@ -529,12 +551,13 @@ function coachHtml(){
     html+=`<div class="acard ${cur?"answered":"due"}">
       <div class="a-top"><div>
         <div class="s-title"><i class="dot" style="background:${esc(sq?.color||"#888")}"></i>
-          <span class="s-squad">${esc(sq?.name||"?")}</span><span class="s-type">${esc(s.type)}</span></div>
+          <span class="s-squad">${esc(sq?.name||"?")}</span><span class="s-type t-${esc(s.type.toLowerCase())}">${esc(s.type)}</span></div>
         <div class="s-sub"><span class="mono">${timeRange(s)}</span>
           ${s.location?`<span>${esc(s.location)}</span>`:""}</div>
-        ${s.note?`<div class="note">${esc(s.note)}</div>`:""}
+        ${showNote(s)?`<div class="note">${esc(s.note)}</div>`:""}
       </div>
-      ${assigned?`<div><span class="working">You're working this</span>${others.length?`<div class="s-sub" style="margin-top:5px">with ${esc(others.join(", "))}</div>`:""}</div>`:""}
+      ${assigned?`<div><span class="working">You're on this</span>${others.length?`<div class="s-sub" style="margin-top:5px">with ${esc(others.join(", "))}</div>`:""}</div>`
+        :(cur==="in"?`<div class="s-sub" style="margin-top:2px">Marked in. Not needed for this one.</div>`:"")}
       </div>
       <div class="tri">
         <button class="tri-b ${cur==="in"?"on-in":""}" data-act="av" data-id="${s.id}" data-v="in">In</button>
@@ -556,8 +579,8 @@ function boardHtml(){
     .map(s=>({s,m:metrics(s)})).filter(r=>!S.holesOnly||r.m.level!=="set");
   let html=`<div class="strip">
     <div class="score"><span class="score-n" style="color:var(--ok)">${totals.set||0}</span><span class="score-l">Covered</span></div>
-    <div class="score"><span class="score-n" style="color:var(--warn)">${(totals.fillable||0)+(totals.thin||0)}</span><span class="score-l">Need assigning</span></div>
-    <div class="score"><span class="score-n" style="color:var(--gap)">${totals.short||0}</span><span class="score-l">Short-staffed</span></div>
+    <div class="score"><span class="score-n" style="color:var(--warn)">${totals.thin||0}</span><span class="score-l">Thin</span></div>
+    <div class="score"><span class="score-n" style="color:var(--gap)">${totals.empty||0}</span><span class="score-l">Nobody yet</span></div>
     <div class="strip-btns">
       <button class="btn btn-ghost" data-act="copygaps">Copy gaps</button>
       <button class="btn btn-ghost" data-act="copychase">Copy chase list</button>
@@ -577,20 +600,21 @@ function boardHtml(){
     const sq=squadById(s.squad_id); const open=S.openId===s.id;
     const confNames=conflicts[s.id]?[...conflicts[s.id]].map(id=>coachById(id)?.name).filter(Boolean):[];
     let slots="";
-    for(let i=0;i<Math.min(m.needed,8);i++){
+    const boxes=Math.min(Math.max(m.needed, m.filled), 8);
+    for(let i=0;i<boxes;i++){
       slots += i<m.filled
         ? `<i class="slot fill" style="background:${esc(sq?.color||"#888")}"></i>`
-        : `<i class="slot open ${m.level==="short"?"short":(m.level!=="set"?"warn":"")}"></i>`;
+        : `<i class="slot open ${m.level==="empty"?"short":"warn"}"></i>`;
     }
     html+=`<article class="sess lvl-${m.level}">
       <button class="sess-main" data-act="open" data-id="${s.id}" aria-expanded="${open}">
         <div class="s-time">${s.all_day?`<b>All</b><span>day</span>`:`<b>${fmtTime(s.start_time)}</b><span>${fmtTime(s.end_time)||""}</span>`}</div>
         <div class="s-mid">
           <div class="s-title"><i class="dot" style="background:${esc(sq?.color||"#888")}"></i>
-            <span class="s-squad">${esc(sq?.name||"?")}</span><span class="s-type">${esc(s.type)}</span>
+            <span class="s-squad">${esc(sq?.name||"?")}</span><span class="s-type t-${esc(s.type.toLowerCase())}">${esc(s.type)}</span>
             <span class="lvl-tag lt-${m.level}">${LEVEL_LABEL[m.level]}</span></div>
           <div class="s-sub">${s.location?`<span>${esc(s.location)}</span>`:""}
-            <span>${m.ins.length} in · ${m.maybes.length} maybe · ${m.silent.length} silent</span>
+            <span>${m.ins.length} in · ${m.maybes.length} maybe · ${m.outs.length} out · ${m.silent.length} silent</span>
             ${confNames.length?`<span class="s-conflict">Double-booked: ${esc(confNames.join(", "))}</span>`:""}</div>
         </div>
         <div class="s-right"><span class="slots">${slots}</span><span class="s-count">${m.filled}/${m.needed}</span></div>
@@ -609,7 +633,7 @@ function assignPanel(s,m,loads){
   const coaches=[...S.roster].sort((a,b)=>{ const A=order(a),B=order(b);
     for(let i=0;i<4;i++){ if(A[i]<B[i])return -1; if(A[i]>B[i])return 1; } return 0; });
   const busy=id=>activeUpcoming().some(o=>o.id!==s.id && overlaps(o,s) && (S.assigns[o.id]||[]).includes(id));
-  let html=`<div class="sess-open"><p class="open-hint">Tap a coach to put her on this session or take her off. She answers from her own link.</p><div class="cgrid">`;
+  let html=`<div class="sess-open"><p class="open-hint">Anyone who taps In is on automatically. Tap a name to take her off or add an extra.</p><div class="cgrid">`;
   coaches.forEach(c=>{
     const v=m.av[c.id]||""; const on=m.assigned.includes(c.id);
     const home=c.squad_ids.includes(s.squad_id);
@@ -621,7 +645,8 @@ function assignPanel(s,m,loads){
   const assignedBusy=m.assigned.filter(busy).map(id=>coachById(id)?.name).filter(Boolean);
   if(assignedBusy.length) html+=`<div class="warnline">Heads up: ${esc(assignedBusy.join(", "))} ${assignedBusy.length===1?"is":"are"} also assigned to something that overlaps.</div>`;
   if(m.silent.length) html+=`<div class="note">Hasn't answered: ${esc(m.silent.map(id=>coachById(id)?.name).join(", "))}</div>`;
-  if(s.note) html+=`<div class="note">${esc(s.note)}</div>`;
+  if(showNote(s)) html+=`<div class="note">${esc(s.note)}</div>`;
+  html+=`<div class="legend">★ home squad &nbsp;·&nbsp; number = sessions she's working &nbsp;·&nbsp; – = hasn't answered</div>`;
   html+=`</div>`;
   return html;
 }
