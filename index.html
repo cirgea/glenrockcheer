@@ -309,6 +309,8 @@ function showNote(s){
 }
 /* ---------- derived ---------- */
 const squadById = id => S.squads.find(s=>s.id===id);
+const scopedUpcoming = () => activeUpcoming().filter(s=>S.filter==="all"||s.squad_id===S.filter);
+const scopeName = () => S.filter==="all" ? "" : (squadById(S.filter)?.name || "");
 const coachById = id => S.roster.find(c=>c.id===id);
 const activeUpcoming = () => S.sessions.filter(s=>s.status==="active");
 function metrics(s){
@@ -464,27 +466,31 @@ function sessLine(s){
   return `${d.dow} ${d.mon} ${d.day} · ${time} · ${sq?.name||"?"} ${s.type}${s.location?` · ${s.location}`:""}`;
 }
 function copyHoles(){
-  const lines=activeUpcoming().map(s=>({s,m:metrics(s)})).filter(r=>r.m.level==="hole")
+  const n=scopeName();
+  const lines=scopedUpcoming().map(s=>({s,m:metrics(s)})).filter(r=>r.m.level==="hole")
     .map(({s})=>`${sessLine(s)}: NOBODY yet`);
-  copyText(lines.length?`Holes, nobody on these:\n${lines.join("\n")}\nTap to answer: ${shareUrl()}`:"No holes. Every session has at least one coach.", "Holes copied. Paste in the group text");
+  copyText(lines.length?`${n?n+" holes":"Holes"}, nobody on these:\n${lines.join("\n")}\nTap to answer: ${shareUrl()}`:(n?`No ${n} holes.`:"No holes. Every session has at least one coach."), "Holes copied. Paste in the group text");
 }
 function copyThin(){
-  const lines=activeUpcoming().map(s=>({s,m:metrics(s)})).filter(r=>r.m.level==="thin")
+  const n=scopeName();
+  const lines=scopedUpcoming().map(s=>({s,m:metrics(s)})).filter(r=>r.m.level==="thin")
     .map(({s,m})=>`${sessLine(s)}: ${m.filled} on it, needs ${m.needed}`);
-  copyText(lines.length?`Thin, under target:\n${lines.join("\n")}\nTap to answer: ${shareUrl()}`:"Nothing thin. Everything with a coach is at target.", "Thin list copied. Paste in the group text");
+  copyText(lines.length?`${n?n+" thin":"Thin"}, under target:\n${lines.join("\n")}\nTap to answer: ${shareUrl()}`:(n?`Nothing thin for ${n}.`:"Nothing thin. Everything with a coach is at target."), "Thin list copied. Paste in the group text");
 }
 function copySilent(){
+  const n=scopeName();
   const lines=S.roster.map(c=>{
-    const n=activeUpcoming().filter(s=>c.squad_ids.includes(s.squad_id) && !(S.avail[s.id]||{})[c.id]).length;
-    return n>0?`${c.name} (${n})`:null;
+    const cnt=scopedUpcoming().filter(s=>c.squad_ids.includes(s.squad_id) && !(S.avail[s.id]||{})[c.id]).length;
+    return cnt>0?`${c.name} (${cnt})`:null;
   }).filter(Boolean);
-  copyText(lines.length?`Silent, haven't answered yet:\n${lines.join("\n")}\nTap to answer: ${shareUrl()}`:"Nobody's silent. Everyone has answered everything.", "Silent list copied. Paste in the group text");
+  copyText(lines.length?`${n?n+" silent":"Silent"}, haven't answered yet:\n${lines.join("\n")}\nTap to answer: ${shareUrl()}`:(n?`Nobody's silent for ${n}.`:"Nobody's silent. Everyone has answered everything."), "Silent list copied. Paste in the group text");
 }
 function copyWeek(){
   const today=todayStr(); const [y,m,d]=today.split("-").map(Number);
   const end=new Date(y,m-1,d+7); const endStr=`${end.getFullYear()}-${String(end.getMonth()+1).padStart(2,"0")}-${String(end.getDate()).padStart(2,"0")}`;
-  const lines=activeUpcoming().filter(s=>s.date<endStr).map(sessLine);
-  copyText(lines.length?`GLEN ROCK CHEER, this week:\n${lines.join("\n")}\n${shareUrl()}`:"Nothing on the board this week.", "Week copied");
+  const n=scopeName();
+  const lines=scopedUpcoming().filter(s=>s.date<endStr).map(sessLine);
+  copyText(lines.length?`GLEN ROCK CHEER, ${n?n+" ":""}this week:\n${lines.join("\n")}\n${shareUrl()}`:(n?`Nothing for ${n} this week.`:"Nothing on the board this week."), "Week copied");
 }
 
 /* ---------- render ---------- */
@@ -574,11 +580,11 @@ function coachHtml(){
 function boardHtml(){
   const all=activeUpcoming();
   if(!all.length) return `<div class="empty"><h2>Nothing on the board</h2><p>Paste your TeamSnap calendar links in Setup and hit Sync, or add sessions by hand.</p><button class="btn btn-red" data-act="tab" data-v="setup">Go to Setup</button></div>`;
+  const scoped=all.filter(s=>S.filter==="all"||s.squad_id===S.filter).map(s=>({s,m:metrics(s)}));
   const totals={};
-  all.forEach(s=>{ const l=metrics(s).level; totals[l]=(totals[l]||0)+1; });
+  scoped.forEach(({m})=>{ totals[m.level]=(totals[m.level]||0)+1; });
   const conflicts=conflictMap(); const loads=loadCounts();
-  const rows=all.filter(s=>S.filter==="all"||s.squad_id===S.filter)
-    .map(s=>({s,m:metrics(s)})).filter(r=>!S.levelFilter||r.m.level===S.levelFilter);
+  const rows=scoped.filter(r=>!S.levelFilter||r.m.level===S.levelFilter);
   let html=`<div class="strip">
     <button class="score score-set ${S.levelFilter==="set"?"on":""}" data-act="lvl" data-v="set" aria-pressed="${S.levelFilter==="set"}"><span class="score-n" style="color:var(--ok)">${totals.set||0}</span><span class="score-l">Covered</span></button>
     <button class="score score-thin ${S.levelFilter==="thin"?"on":""}" data-act="lvl" data-v="thin" aria-pressed="${S.levelFilter==="thin"}"><span class="score-n" style="color:var(--warn)">${totals.thin||0}</span><span class="score-l">Thin</span></button>
