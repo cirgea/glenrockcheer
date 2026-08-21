@@ -592,6 +592,7 @@ function pickerHtml(){
     <div class="stripe" style="max-width:120px;margin:14px auto"></div>
     <h2 class="cond" style="font-size:24px;margin:20px 0 4px">Who are you?</h2>
     <p>Tap your name once. This phone remembers you after that.</p>
+    <p style="font-size:12.5px">Admins aren't listed here. Open your private admin link instead.</p>
     ${coaches.length
       ? `<div class="pickgrid">${coaches.map(c=>`<button class="pickbtn" data-act="pick" data-id="${c.id}">${esc(c.name)}</button>`).join("")}</div>`
       : `<p>Germaine hasn't added the coaches yet. Check back once she has.</p>`}
@@ -998,7 +999,12 @@ $app.addEventListener("click", e=>{
     supa.rpc("gc_roster").then(({data})=>{ S.roster=data||[]; render(); });
     render(); }
   else if(act==="clink"){ const c=coachById(id);
-    copyText(`${location.origin}${location.pathname}?c=${c.token||""}`, `Link copied. Text it to ${c.name}`); }
+    if(!S.me.token){ toast("Open your own admin link first, then copy hers", true); return; }
+    supa.rpc("gc_admin_roster",{t:S.me.token}).then(({data, error})=>{
+      const row=(data||[]).find(x=>x.id===id);
+      if(error || !row || !row.token){ toast("Couldn't get her link, try a reload", true); return; }
+      copyText(`${location.origin}${location.pathname}?c=${row.token}`, `Link copied. Text it to ${c.name}`);
+    }); }
   else if(act==="csquad"){ const c=coachById(id); const sq=el.dataset.sq;
     const next=c.squad_ids.includes(sq)?c.squad_ids.filter(x=>x!==sq):[...c.squad_ids, sq];
     updateCoach(id,{squad_ids:next}); render(); }
