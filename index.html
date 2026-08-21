@@ -205,6 +205,56 @@ input:focus,select:focus{border-color:var(--ink); outline:none}
 .syncerr{color:var(--gap)}
 .mutetxt{color:var(--slate)}
 
+/* coach-filter mode */
+.ans{font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; font-weight:700; border-radius:4px; padding:2px 8px}
+.ans-in{color:#fff; background:var(--ok)}
+.ans-out{color:#fff; background:var(--ink)}
+.ans-silent{color:var(--gap); background:var(--gap-bg); border:1px solid var(--gap)}
+.a-in{border-left-color:var(--ok)} .a-out{border-left-color:var(--ink)} .a-silent{border-left-color:var(--gap)}
+.score.on.score-out{background:#EDEEF0; box-shadow:inset 0 -3px 0 var(--ink)}
+select.coachpick{border:1px solid var(--line); border-radius:999px; padding:7px 12px;
+  font:600 13px 'Barlow',sans-serif; background:#fff; color:var(--ink); min-height:36px}
+select.coachpick:has(option:checked:not([value=""])){border-color:var(--ink)}
+
+/* availability view toggle + month calendar */
+.me-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.seg{display:flex; border:1px solid var(--ink); border-radius:999px; overflow:hidden}
+.seg button{background:#fff; border:none; padding:8px 15px; font:600 13px 'Barlow',sans-serif; color:var(--ink); min-height:38px}
+.seg button.on{background:var(--ink); color:#fff}
+.calmon{display:flex; justify-content:space-between; align-items:center; margin:14px 0 10px}
+.calmon h3{font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.08em; font-size:19px; margin:0; font-weight:700}
+.calnav{background:#fff; border:1px solid var(--line); border-radius:6px; width:38px; height:38px; font-size:17px}
+.cal{background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden}
+.caldows,.calweek{display:grid; grid-template-columns:repeat(7,1fr)}
+.caldows{border-bottom:1px solid var(--line)}
+.caldows span{font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.1em; font-size:12px;
+  color:var(--slate); text-align:center; padding:8px 0}
+.calcell{min-height:66px; border-bottom:1px solid var(--line); border-right:1px solid var(--line);
+  padding:6px 5px; cursor:pointer; position:relative; background:#fff; text-align:left; font:inherit; display:block; color:inherit; border-top:none; border-left:none}
+.calweek .calcell:last-child{border-right:none}
+.cal .calweek:last-child .calcell{border-bottom:none}
+.calcell.dim{background:#FAFAF8; color:#B9BDC4; cursor:default}
+.calcell .cn{font-family:'IBM Plex Mono',monospace; font-size:12.5px}
+.calcell.today .cn{color:var(--red); font-weight:700}
+.calcell.sel{outline:3px solid var(--ink); outline-offset:-3px; border-radius:6px; z-index:1}
+.calpills{display:flex; flex-direction:column; gap:3px; margin-top:5px}
+.pill{font:500 10px 'IBM Plex Mono',monospace; border-radius:4px; padding:2px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block}
+.pill .sq{display:none}
+.p-in{background:var(--ok-bg); color:var(--ok)}
+.p-out{background:#EDEEF0; color:var(--ink)}
+.p-need{background:var(--gap-bg); color:var(--gap); font-weight:700}
+.calmore{font:500 9.5px 'Barlow',sans-serif; color:var(--slate)}
+.callegend{display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--slate); margin:10px 2px 4px}
+.callegend .sw{width:14px; height:10px; border-radius:3px; display:inline-block; margin-right:5px; vertical-align:-1px}
+.sw-in{background:var(--ok-bg); border:1px solid var(--ok)}
+.sw-out{background:#EDEEF0; border:1px solid var(--ink)}
+.sw-need{background:var(--gap-bg); border:1px solid var(--gap)}
+@media (min-width:760px){
+  .calcell{min-height:78px}
+  .pill{font-size:10.5px; padding:2px 5px}
+  .pill .sq{display:inline}
+}
+
 .empty{text-align:center; padding:52px 18px; border:1px dashed var(--line); border-radius:8px; background:#fff}
 .empty h2{font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.07em; font-size:22px; margin:0 0 8px}
 .empty p{color:var(--slate); margin:0 0 16px}
@@ -253,6 +303,9 @@ const supa = window.supabase.createClient(CFG.url, CFG.key);
 const S = {
   me: null, squads: [], roster: [], sessions: [], avail: {}, assigns: {},
   tab: "board", filter: "all", levelFilter: null, openId: null,
+  coachFilter: null, answerFilter: null,
+  availView: (function(){ try{ return localStorage.getItem("gc_avail_view")==="cal"?"cal":"list"; }catch(e){ return "list"; } })(),
+  calMonth: null, calSel: null,
   syncResult: null, syncing: false, gate: "loading", timers: false
 };
 const shareUrl = () => location.origin + location.pathname;
@@ -538,26 +591,11 @@ function pickerHtml(){
 }
 
 /* coach view (also admin "Mine" tab) */
-function coachHtml(){
-  const mine=activeUpcoming().filter(s=>S.me.squad_ids.includes(s.squad_id));
-  if(!S.me.squad_ids.length) return `<div class="empty"><h2>No squad yet</h2><p>Germaine hasn't put you on a squad. Once she does, your schedule shows up here.</p></div>`;
-  if(!mine.length) return `<div class="empty"><h2>Nothing scheduled</h2><p>Your squad has no upcoming sessions on the board yet.</p></div>`;
-  const unanswered=mine.filter(s=>!(S.avail[s.id]||{})[S.me.id]);
-  let html=`<div class="me-head"><div><h2>Your schedule</h2>
-    <p class="${unanswered.length?"due":""}">${unanswered.length
-      ? `${unanswered.length} session${unanswered.length===1?"":"s"} need${unanswered.length===1?"s":""} your answer`
-      : "You've answered everything upcoming"}</p></div>
-    ${unanswered.length>1?`<button class="btn btn-red" data-act="allin">I'm in for all ${unanswered.length}</button>`:""}
-  </div>`;
-  let prevDate=null; const today=todayStr();
-  mine.forEach(s=>{
-    if(s.date!==prevDate){ const d=fmtDate(s.date);
-      html+=`<div class="day ${s.date===today?"today":""}"><span class="day-dow">${s.date===today?"Today":d.dow}</span><span class="day-date">${d.mon} ${d.day}</span><span class="day-rule"></span></div>`;
-      prevDate=s.date; }
-    const sq=squadById(s.squad_id); const cur=(S.avail[s.id]||{})[S.me.id]||"";
-    const assigned=(S.assigns[s.id]||[]).includes(S.me.id);
-    const others=(S.assigns[s.id]||[]).filter(id=>id!==S.me.id).map(id=>coachById(id)?.name).filter(Boolean);
-    html+=`<div class="acard ${cur?"answered":"due"}">
+function coachCard(s){
+  const sq=squadById(s.squad_id); const cur=(S.avail[s.id]||{})[S.me.id]||"";
+  const assigned=(S.assigns[s.id]||[]).includes(S.me.id);
+  const others=(S.assigns[s.id]||[]).filter(id=>id!==S.me.id).map(id=>coachById(id)?.name).filter(Boolean);
+  return `<div class="acard ${cur?"answered":"due"}">
       <div class="a-top"><div>
         <div class="s-title"><i class="dot" style="background:${esc(sq?.color||"#888")}"></i>
           <span class="s-squad">${esc(sq?.name||"?")}</span><span class="s-type t-${esc(s.type.toLowerCase())}">${esc(s.type)}</span></div>
@@ -572,7 +610,93 @@ function coachHtml(){
         <button class="tri-b ${cur==="in"?"on-in":""}" data-act="av" data-id="${s.id}" data-v="in">In</button>
         <button class="tri-b ${cur==="out"?"on-out":""}" data-act="av" data-id="${s.id}" data-v="out">Out</button>
       </div></div>`;
+}
+function coachHtml(){
+  const mine=activeUpcoming().filter(s=>S.me.squad_ids.includes(s.squad_id));
+  if(!S.me.squad_ids.length) return `<div class="empty"><h2>No squad yet</h2><p>Germaine hasn't put you on a squad. Once she does, your schedule shows up here.</p></div>`;
+  if(!mine.length) return `<div class="empty"><h2>Nothing scheduled</h2><p>Your squad has no upcoming sessions on the board yet.</p></div>`;
+  const unanswered=mine.filter(s=>!(S.avail[s.id]||{})[S.me.id]);
+  let html=`<div class="me-head"><div><h2>Your schedule</h2>
+    <p class="${unanswered.length?"due":""}">${unanswered.length
+      ? `${unanswered.length} session${unanswered.length===1?"":"s"} need${unanswered.length===1?"s":""} your answer`
+      : "You've answered everything upcoming"}</p></div>
+    <div class="me-actions">
+      ${unanswered.length>1?`<button class="btn btn-red" data-act="allin">I'm in for all ${unanswered.length}</button>`:""}
+      <div class="seg" role="tablist">
+        <button class="${S.availView==="list"?"on":""}" data-act="availview" data-v="list">List</button>
+        <button class="${S.availView==="cal"?"on":""}" data-act="availview" data-v="cal">Calendar</button>
+      </div>
+    </div>
+  </div>`;
+  if(S.availView==="cal") return html + calHtml(mine);
+  let prevDate=null; const today=todayStr();
+  mine.forEach(s=>{
+    if(s.date!==prevDate){ const d=fmtDate(s.date);
+      html+=`<div class="day ${s.date===today?"today":""}"><span class="day-dow">${s.date===today?"Today":d.dow}</span><span class="day-date">${d.mon} ${d.day}</span><span class="day-rule"></span></div>`;
+      prevDate=s.date; }
+    html+=coachCard(s);
   });
+  return html;
+}
+
+/* month calendar for the coach's own sessions */
+const MONFULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const pad2=n=>String(n).padStart(2,"0");
+function calHtml(mine){
+  const today=todayStr();
+  if(!S.calMonth){ const [y,m]=today.split("-").map(Number); S.calMonth={y, m:m-1}; }
+  if(S.calSel===null) S.calSel=today;
+  const {y,m}=S.calMonth;
+  const byDate={};
+  mine.forEach(s=>{ (byDate[s.date] ??= []).push(s); });
+  const first=new Date(y,m,1), lead=first.getDay(), dim=new Date(y,m+1,0).getDate();
+  const prevDim=new Date(y,m,0).getDate();
+  const cells=[];
+  for(let i=0;i<lead;i++) cells.push({n:prevDim-lead+1+i, other:true});
+  for(let d=1;d<=dim;d++) cells.push({n:d, other:false, ds:`${y}-${pad2(m+1)}-${pad2(d)}`});
+  while(cells.length%7) cells.push({n:cells.length- lead - dim + 1, other:true});
+  const pill=s=>{
+    const v=(S.avail[s.id]||{})[S.me.id];
+    const cls=v==="in"?"p-in":v==="out"?"p-out":"p-need";
+    const t=s.all_day?"All day":fmtTime(s.start_time);
+    const sq=squadById(s.squad_id);
+    return `<span class="pill ${cls}">${esc(t)}<span class="sq"> ${esc(sq?.name||"")}</span></span>`;
+  };
+  let grid="";
+  cells.forEach((c,i)=>{
+    if(i%7===0) grid+='<div class="calweek">';
+    if(c.other){ grid+=`<span class="calcell dim"><span class="cn">${c.n}</span></span>`; }
+    else{
+      const marks=(byDate[c.ds]||[]);
+      grid+=`<button class="calcell ${c.ds===today?"today":""} ${c.ds===S.calSel?"sel":""}" data-act="calday" data-d="${c.ds}" aria-label="${c.ds}">
+        <span class="cn">${c.n}</span>
+        <span class="calpills">${marks.slice(0,2).map(pill).join("")}${marks.length>2?`<span class="calmore">+${marks.length-2} more</span>`:""}</span>
+      </button>`;
+    }
+    if(i%7===6) grid+='</div>';
+  });
+  const selSess=(byDate[S.calSel]||[]);
+  const sd=S.calSel?fmtDate(S.calSel):null;
+  let html=`<div class="calmon">
+      <button class="calnav" data-act="calprev" aria-label="Previous month">‹</button>
+      <h3>${MONFULL[m]} ${y}</h3>
+      <button class="calnav" data-act="calnext" aria-label="Next month">›</button>
+    </div>
+    <div class="cal">
+      <div class="caldows"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+      ${grid}
+    </div>
+    <div class="callegend">
+      <span><i class="sw sw-in"></i>You're in</span>
+      <span><i class="sw sw-out"></i>You're out</span>
+      <span><i class="sw sw-need"></i>Needs your answer</span>
+    </div>`;
+  if(S.calSel){
+    html+=`<div class="day"><span class="day-dow ${S.calSel===today?"today":""}">${S.calSel===today?"Today":sd.dow}</span><span class="day-date">${sd.mon} ${sd.day}</span><span class="day-rule"></span></div>`;
+    html+= selSess.length ? selSess.map(coachCard).join("") : `<p class="mutetxt">Nothing on this day.</p>`;
+  } else {
+    html+=`<p class="mutetxt" style="margin-top:14px">Tap a day to answer its sessions.</p>`;
+  }
   return html;
 }
 
@@ -580,29 +704,46 @@ function coachHtml(){
 function boardHtml(){
   const all=activeUpcoming();
   if(!all.length) return `<div class="empty"><h2>Nothing on the board</h2><p>Paste your TeamSnap calendar links in Setup and hit Sync, or add sessions by hand.</p><button class="btn btn-red" data-act="tab" data-v="setup">Go to Setup</button></div>`;
-  const scoped=all.filter(s=>S.filter==="all"||s.squad_id===S.filter).map(s=>({s,m:metrics(s)}));
+  const C=S.coachFilter?coachById(S.coachFilter):null;
+  let scoped=all.filter(s=>S.filter==="all"||s.squad_id===S.filter);
+  if(C) scoped=scoped.filter(s=>C.squad_ids.includes(s.squad_id));
+  scoped=scoped.map(s=>({s, m:metrics(s), a:C?(((S.avail[s.id]||{})[C.id])||"silent"):null}));
   const totals={};
-  scoped.forEach(({m})=>{ totals[m.level]=(totals[m.level]||0)+1; });
+  if(C) scoped.forEach(({a})=>{ totals[a]=(totals[a]||0)+1; });
+  else scoped.forEach(({m})=>{ totals[m.level]=(totals[m.level]||0)+1; });
   const conflicts=conflictMap(); const loads=loadCounts();
-  const rows=scoped.filter(r=>!S.levelFilter||r.m.level===S.levelFilter);
+  const rows=C
+    ? scoped.filter(r=>!S.answerFilter||r.a===S.answerFilter)
+    : scoped.filter(r=>!S.levelFilter||r.m.level===S.levelFilter);
+  const stripScores=C
+    ? `<button class="score score-set ${S.answerFilter==="in"?"on":""}" data-act="ans" data-v="in" aria-pressed="${S.answerFilter==="in"}"><span class="score-n" style="color:var(--ok)">${totals.in||0}</span><span class="score-l">In</span></button>
+       <button class="score score-out ${S.answerFilter==="out"?"on":""}" data-act="ans" data-v="out" aria-pressed="${S.answerFilter==="out"}"><span class="score-n" style="color:var(--ink)">${totals.out||0}</span><span class="score-l">Out</span></button>
+       <button class="score score-hole ${S.answerFilter==="silent"?"on":""}" data-act="ans" data-v="silent" aria-pressed="${S.answerFilter==="silent"}"><span class="score-n" style="color:var(--gap)">${totals.silent||0}</span><span class="score-l">Silent</span></button>`
+    : `<button class="score score-set ${S.levelFilter==="set"?"on":""}" data-act="lvl" data-v="set" aria-pressed="${S.levelFilter==="set"}"><span class="score-n" style="color:var(--ok)">${totals.set||0}</span><span class="score-l">Covered</span></button>
+       <button class="score score-thin ${S.levelFilter==="thin"?"on":""}" data-act="lvl" data-v="thin" aria-pressed="${S.levelFilter==="thin"}"><span class="score-n" style="color:var(--warn)">${totals.thin||0}</span><span class="score-l">Thin</span></button>
+       <button class="score score-hole ${S.levelFilter==="hole"?"on":""}" data-act="lvl" data-v="hole" aria-pressed="${S.levelFilter==="hole"}"><span class="score-n" style="color:var(--gap)">${totals.hole||0}</span><span class="score-l">Holes</span></button>`;
   let html=`<div class="strip">
-    <button class="score score-set ${S.levelFilter==="set"?"on":""}" data-act="lvl" data-v="set" aria-pressed="${S.levelFilter==="set"}"><span class="score-n" style="color:var(--ok)">${totals.set||0}</span><span class="score-l">Covered</span></button>
-    <button class="score score-thin ${S.levelFilter==="thin"?"on":""}" data-act="lvl" data-v="thin" aria-pressed="${S.levelFilter==="thin"}"><span class="score-n" style="color:var(--warn)">${totals.thin||0}</span><span class="score-l">Thin</span></button>
-    <button class="score score-hole ${S.levelFilter==="hole"?"on":""}" data-act="lvl" data-v="hole" aria-pressed="${S.levelFilter==="hole"}"><span class="score-n" style="color:var(--gap)">${totals.hole||0}</span><span class="score-l">Holes</span></button>
+    ${stripScores}
     <div class="strip-btns">
       <button class="btn btn-ghost" data-act="copyholes">Copy holes</button>
       <button class="btn btn-ghost" data-act="copythin">Copy thin</button>
       <button class="btn btn-ghost" data-act="copysilent">Copy silent</button>
       <button class="btn btn-ghost" data-act="copyweek">Copy week</button>
     </div></div>
-  <p class="filterhint">Tap a count to filter. Tap again to clear.</p>
+  <p class="filterhint">${C?`Showing <b>${esc(C.name)}'s</b> answers. Tap a count to filter. Pick Everyone to go back.`:"Tap a count to filter. Tap again to clear."}</p>
   <div class="filters"><div class="chips">
     <button class="chip ${S.filter==="all"?"on":""}" data-act="filter" data-v="all">All squads</button>
     ${S.squads.map(sq=>`<button class="chip ${S.filter===sq.id?"on":""}" data-act="filter" data-v="${sq.id}"><i class="dot" style="background:${esc(sq.color)}"></i>${esc(sq.name)}</button>`).join("")}
+    <select class="coachpick" data-act="coachpick" aria-label="Filter by coach">
+      <option value="">Everyone</option>
+      ${[...S.roster].filter(c=>c.squad_ids.length).sort((a,b)=>a.name.localeCompare(b.name))
+        .map(c=>`<option value="${c.id}" ${S.coachFilter===c.id?"selected":""}>${esc(c.name)}</option>`).join("")}
+    </select>
   </div></div>`;
   if(!rows.length) html+=`<p class="mutetxt">Nothing matches that filter.</p>`;
   let prevDate=null; const today=todayStr();
-  rows.forEach(({s,m})=>{
+  const ANS_LABEL={in:"In", out:"Out", silent:"Silent"};
+  rows.forEach(({s,m,a})=>{
     if(s.date!==prevDate){ const d=fmtDate(s.date);
       html+=`<div class="day ${s.date===today?"today":""}"><span class="day-dow">${s.date===today?"Today":d.dow}</span><span class="day-date">${d.mon} ${d.day}</span><span class="day-rule"></span></div>`;
       prevDate=s.date; }
@@ -615,18 +756,25 @@ function boardHtml(){
         ? `<i class="slot fill" style="background:${esc(sq?.color||"#888")}"></i>`
         : `<i class="slot open ${m.level==="hole"?"short":"warn"}"></i>`;
     }
-    html+=`<article class="sess lvl-${m.level}">
+    const tag=C
+      ? `<span class="ans ans-${a}">${ANS_LABEL[a]}</span>`
+      : `<span class="lvl-tag lt-${m.level}">${LEVEL_LABEL[m.level]}</span>`;
+    const border=C?`a-${a}`:`lvl-${m.level}`;
+    const right=C
+      ? `<span class="s-count">${m.filled}/${m.needed}</span>`
+      : `<span class="slots">${slots}</span><span class="s-count">${m.filled}/${m.needed}</span>`;
+    html+=`<article class="sess ${border}">
       <button class="sess-main" data-act="open" data-id="${s.id}" aria-expanded="${open}">
         <div class="s-time">${s.all_day?`<b>All</b><span>day</span>`:`<b>${fmtTime(s.start_time)}</b><span>${fmtTime(s.end_time)||""}</span>`}</div>
         <div class="s-mid">
           <div class="s-title"><i class="dot" style="background:${esc(sq?.color||"#888")}"></i>
             <span class="s-squad">${esc(sq?.name||"?")}</span><span class="s-type t-${esc(s.type.toLowerCase())}">${esc(s.type)}</span>
-            <span class="lvl-tag lt-${m.level}">${LEVEL_LABEL[m.level]}</span></div>
+            ${tag}</div>
           <div class="s-sub">${s.location?`<span>${esc(s.location)}</span>`:""}
-            <span>${m.ins.length} in · ${m.outs.length} out · ${m.silent.length} silent</span>
+            ${C?"":`<span>${m.ins.length} in · ${m.outs.length} out · ${m.silent.length} silent</span>`}
             ${confNames.length?`<span class="s-conflict">Double-booked: ${esc(confNames.join(", "))}</span>`:""}</div>
         </div>
-        <div class="s-right"><span class="slots">${slots}</span><span class="s-count">${m.filled}/${m.needed}</span></div>
+        <div class="s-right">${right}</div>
       </button>
       ${open?assignPanel(s,m,loads):""}
     </article>`;
@@ -754,6 +902,20 @@ $app.addEventListener("click", e=>{
   }
   else if(act==="assign") toggleAssign(id, el.dataset.cid);
   else if(act==="lvl"){ S.levelFilter=S.levelFilter===el.dataset.v?null:el.dataset.v; render(); }
+  else if(act==="ans"){ S.answerFilter=S.answerFilter===el.dataset.v?null:el.dataset.v; render(); }
+  else if(act==="availview"){ S.availView=el.dataset.v;
+    try{ localStorage.setItem("gc_avail_view", S.availView); }catch(err){} render(); }
+  else if(act==="calprev"||act==="calnext"){
+    const d=act==="calnext"?1:-1; let {y,m}=S.calMonth; m+=d;
+    if(m<0){m=11;y--;} if(m>11){m=0;y++;}
+    S.calMonth={y,m};
+    const mine=activeUpcoming().filter(s=>S.me.squad_ids.includes(s.squad_id));
+    const pref=`${y}-${pad2(m+1)}-`;
+    const firstIn=mine.find(s=>s.date.startsWith(pref));
+    const t=todayStr();
+    S.calSel=t.startsWith(pref)?t:(firstIn?firstIn.date:null);
+    render(); }
+  else if(act==="calday"){ S.calSel=el.dataset.d; render(); }
   else if(act==="copyholes") copyHoles();
   else if(act==="copythin") copyThin();
   else if(act==="copysilent") copySilent();
@@ -789,7 +951,8 @@ $app.addEventListener("click", e=>{
 $app.addEventListener("change", e=>{
   const el=e.target.closest("[data-act]"); if(!el) return;
   const act=el.dataset.act, id=el.dataset.id, v=el.value;
-  if(act==="sqcolor"){ updateSquad(id,{color:v}); render(); }
+  if(act==="coachpick"){ S.coachFilter=v||null; S.answerFilter=null; S.levelFilter=null; render(); }
+  else if(act==="sqcolor"){ updateSquad(id,{color:v}); render(); }
   else if(act==="sqneeded") updateSquad(id,{needed:Math.max(1,Number(v)||1)});
   else if(act==="sneeded") updateSessionNeeded(id, v);
   else if(act==="cadmin"){ if(id===S.me.id){ toast("You can't take admin off yourself", true); render(); return; }
