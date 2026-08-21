@@ -243,12 +243,18 @@ select.coachpick:has(option:checked:not([value=""])){border-color:var(--ink)}
 .p-in{background:var(--ok-bg); color:var(--ok)}
 .p-out{background:#EDEEF0; color:var(--ink)}
 .p-need{background:var(--gap-bg); color:var(--gap); font-weight:700}
+.p-set{background:var(--ok-bg); color:var(--ok)}
+.p-thin{background:var(--warn-bg); color:var(--warn); font-weight:600}
+.p-hole{background:var(--gap-bg); color:var(--gap); font-weight:700}
 .calmore{font:500 9.5px 'Barlow',sans-serif; color:var(--slate)}
 .callegend{display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--slate); margin:10px 2px 4px}
 .callegend .sw{width:14px; height:10px; border-radius:3px; display:inline-block; margin-right:5px; vertical-align:-1px}
 .sw-in{background:var(--ok-bg); border:1px solid var(--ok)}
 .sw-out{background:#EDEEF0; border:1px solid var(--ink)}
 .sw-need{background:var(--gap-bg); border:1px solid var(--gap)}
+.sw-set{background:var(--ok-bg); border:1px solid var(--ok)}
+.sw-thin{background:var(--warn-bg); border:1px solid var(--warn)}
+.sw-holepill{background:var(--gap-bg); border:1px solid var(--gap)}
 @media (min-width:760px){
   .calcell{min-height:78px}
   .pill{font-size:10.5px; padding:2px 5px}
@@ -306,6 +312,8 @@ const S = {
   coachFilter: null, answerFilter: null,
   availView: (function(){ try{ return localStorage.getItem("gc_avail_view")==="cal"?"cal":"list"; }catch(e){ return "list"; } })(),
   calMonth: null, calSel: null,
+  boardView: (function(){ try{ return localStorage.getItem("gc_board_view")==="cal"?"cal":"list"; }catch(e){ return "list"; } })(),
+  bCalMonth: null, bCalSel: null,
   syncResult: null, syncing: false, gate: "loading", timers: false
 };
 const shareUrl = () => location.origin + location.pathname;
@@ -642,55 +650,68 @@ function coachHtml(){
 /* month calendar for the coach's own sessions */
 const MONFULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const pad2=n=>String(n).padStart(2,"0");
-function calHtml(mine){
+// Shared month grid. cfg: {month:{y,m}, sel, byDate, pillFor(s), cap, acts:{prev,next,day}}
+function calGrid(cfg){
   const today=todayStr();
-  if(!S.calMonth){ const [y,m]=today.split("-").map(Number); S.calMonth={y, m:m-1}; }
-  if(S.calSel===null) S.calSel=today;
-  const {y,m}=S.calMonth;
-  const byDate={};
-  mine.forEach(s=>{ (byDate[s.date] ??= []).push(s); });
+  const {y,m}=cfg.month;
   const first=new Date(y,m,1), lead=first.getDay(), dim=new Date(y,m+1,0).getDate();
   const prevDim=new Date(y,m,0).getDate();
   const cells=[];
   for(let i=0;i<lead;i++) cells.push({n:prevDim-lead+1+i, other:true});
   for(let d=1;d<=dim;d++) cells.push({n:d, other:false, ds:`${y}-${pad2(m+1)}-${pad2(d)}`});
-  while(cells.length%7) cells.push({n:cells.length- lead - dim + 1, other:true});
-  const pill=s=>{
+  let trail=1; while(cells.length%7) cells.push({n:trail++, other:true});
+  let grid="";
+  cells.forEach((c,i)=>{
+    if(i%7===0) grid+='<div class="calweek">';
+    if(c.other){ grid+=`<span class="calcell dim"><span class="cn">${c.n}</span></span>`; }
+    else{
+      const marks=(cfg.byDate[c.ds]||[]);
+      grid+=`<button class="calcell ${c.ds===today?"today":""} ${c.ds===cfg.sel?"sel":""}" data-act="${cfg.acts.day}" data-d="${c.ds}" aria-label="${c.ds}">
+        <span class="cn">${c.n}</span>
+        <span class="calpills">${marks.slice(0,cfg.cap).map(cfg.pillFor).join("")}${marks.length>cfg.cap?`<span class="calmore">+${marks.length-cfg.cap} more</span>`:""}</span>
+      </button>`;
+    }
+    if(i%7===6) grid+='</div>';
+  });
+  return `<div class="calmon">
+      <button class="calnav" data-act="${cfg.acts.prev}" aria-label="Previous month">‹</button>
+      <h3>${MONFULL[m]} ${y}</h3>
+      <button class="calnav" data-act="${cfg.acts.next}" aria-label="Next month">›</button>
+    </div>
+    <div class="cal">
+      <div class="caldows"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+      ${grid}
+    </div>`;
+}
+function monthShift(state, dir, dates){
+  let {y,m}=state; m+=dir;
+  if(m<0){m=11;y--;} if(m>11){m=0;y++;}
+  const pref=`${y}-${pad2(m+1)}-`;
+  const t=todayStr();
+  const firstIn=dates.find(ds=>ds.startsWith(pref));
+  return {month:{y,m}, sel: t.startsWith(pref)?t:(firstIn||null)};
+}
+function calHtml(mine){
+  const today=todayStr();
+  if(!S.calMonth){ const [y,m]=today.split("-").map(Number); S.calMonth={y, m:m-1}; }
+  if(S.calSel===null) S.calSel=today;
+  const byDate={};
+  mine.forEach(s=>{ (byDate[s.date] ??= []).push(s); });
+  const pillFor=s=>{
     const v=(S.avail[s.id]||{})[S.me.id];
     const cls=v==="in"?"p-in":v==="out"?"p-out":"p-need";
     const t=s.all_day?"All day":fmtTime(s.start_time);
     const sq=squadById(s.squad_id);
     return `<span class="pill ${cls}">${esc(t)}<span class="sq"> ${esc(sq?.name||"")}</span></span>`;
   };
-  let grid="";
-  cells.forEach((c,i)=>{
-    if(i%7===0) grid+='<div class="calweek">';
-    if(c.other){ grid+=`<span class="calcell dim"><span class="cn">${c.n}</span></span>`; }
-    else{
-      const marks=(byDate[c.ds]||[]);
-      grid+=`<button class="calcell ${c.ds===today?"today":""} ${c.ds===S.calSel?"sel":""}" data-act="calday" data-d="${c.ds}" aria-label="${c.ds}">
-        <span class="cn">${c.n}</span>
-        <span class="calpills">${marks.slice(0,2).map(pill).join("")}${marks.length>2?`<span class="calmore">+${marks.length-2} more</span>`:""}</span>
-      </button>`;
-    }
-    if(i%7===6) grid+='</div>';
-  });
-  const selSess=(byDate[S.calSel]||[]);
-  const sd=S.calSel?fmtDate(S.calSel):null;
-  let html=`<div class="calmon">
-      <button class="calnav" data-act="calprev" aria-label="Previous month">‹</button>
-      <h3>${MONFULL[m]} ${y}</h3>
-      <button class="calnav" data-act="calnext" aria-label="Next month">›</button>
-    </div>
-    <div class="cal">
-      <div class="caldows"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
-      ${grid}
-    </div>
-    <div class="callegend">
+  let html=calGrid({month:S.calMonth, sel:S.calSel, byDate, pillFor, cap:2, acts:{prev:"calprev",next:"calnext",day:"calday"}});
+  html+=`<div class="callegend">
       <span><i class="sw sw-in"></i>You're in</span>
       <span><i class="sw sw-out"></i>You're out</span>
       <span><i class="sw sw-need"></i>Needs your answer</span>
     </div>`;
+  const selSess=(byDate[S.calSel]||[]);
+  const sd=S.calSel?fmtDate(S.calSel):null;
   if(S.calSel){
     html+=`<div class="day"><span class="day-dow ${S.calSel===today?"today":""}">${S.calSel===today?"Today":sd.dow}</span><span class="day-date">${sd.mon} ${sd.day}</span><span class="day-rule"></span></div>`;
     html+= selSess.length ? selSess.map(coachCard).join("") : `<p class="mutetxt">Nothing on this day.</p>`;
@@ -739,31 +760,38 @@ function boardHtml(){
       ${[...S.roster].filter(c=>c.squad_ids.length).sort((a,b)=>a.name.localeCompare(b.name))
         .map(c=>`<option value="${c.id}" ${S.coachFilter===c.id?"selected":""}>${esc(c.name)}</option>`).join("")}
     </select>
+    <div class="seg"><button class="${S.boardView==="list"?"on":""}" data-act="boardview" data-v="list">List</button><button class="${S.boardView==="cal"?"on":""}" data-act="boardview" data-v="cal">Calendar</button></div>
   </div></div>`;
+  if(S.boardView==="cal") return html + boardCalHtml(rows, C, conflicts, loads);
   if(!rows.length) html+=`<p class="mutetxt">Nothing matches that filter.</p>`;
   let prevDate=null; const today=todayStr();
-  const ANS_LABEL={in:"In", out:"Out", silent:"Silent"};
   rows.forEach(({s,m,a})=>{
     if(s.date!==prevDate){ const d=fmtDate(s.date);
       html+=`<div class="day ${s.date===today?"today":""}"><span class="day-dow">${s.date===today?"Today":d.dow}</span><span class="day-date">${d.mon} ${d.day}</span><span class="day-rule"></span></div>`;
       prevDate=s.date; }
-    const sq=squadById(s.squad_id); const open=S.openId===s.id;
-    const confNames=conflicts[s.id]?[...conflicts[s.id]].map(id=>coachById(id)?.name).filter(Boolean):[];
-    let slots="";
-    const boxes=Math.min(Math.max(m.needed, m.filled), 8);
-    for(let i=0;i<boxes;i++){
-      slots += i<m.filled
-        ? `<i class="slot fill" style="background:${esc(sq?.color||"#888")}"></i>`
-        : `<i class="slot open ${m.level==="hole"?"short":"warn"}"></i>`;
-    }
-    const tag=C
-      ? `<span class="ans ans-${a}">${ANS_LABEL[a]}</span>`
-      : `<span class="lvl-tag lt-${m.level}">${LEVEL_LABEL[m.level]}</span>`;
-    const border=C?`a-${a}`:`lvl-${m.level}`;
-    const right=C
-      ? `<span class="s-count">${m.filled}/${m.needed}</span>`
-      : `<span class="slots">${slots}</span><span class="s-count">${m.filled}/${m.needed}</span>`;
-    html+=`<article class="sess ${border}">
+    html+=boardRow({s,m,a}, C, conflicts, loads);
+  });
+  return html;
+}
+const ANS_LABEL={in:"In", out:"Out", silent:"Silent"};
+function boardRow({s,m,a}, C, conflicts, loads){
+  const sq=squadById(s.squad_id); const open=S.openId===s.id;
+  const confNames=conflicts[s.id]?[...conflicts[s.id]].map(id=>coachById(id)?.name).filter(Boolean):[];
+  let slots="";
+  const boxes=Math.min(Math.max(m.needed, m.filled), 8);
+  for(let i=0;i<boxes;i++){
+    slots += i<m.filled
+      ? `<i class="slot fill" style="background:${esc(sq?.color||"#888")}"></i>`
+      : `<i class="slot open ${m.level==="hole"?"short":"warn"}"></i>`;
+  }
+  const tag=C
+    ? `<span class="ans ans-${a}">${ANS_LABEL[a]}</span>`
+    : `<span class="lvl-tag lt-${m.level}">${LEVEL_LABEL[m.level]}</span>`;
+  const border=C?`a-${a}`:`lvl-${m.level}`;
+  const right=C
+    ? `<span class="s-count">${m.filled}/${m.needed}</span>`
+    : `<span class="slots">${slots}</span><span class="s-count">${m.filled}/${m.needed}</span>`;
+  return `<article class="sess ${border}">
       <button class="sess-main" data-act="open" data-id="${s.id}" aria-expanded="${open}">
         <div class="s-time">${s.all_day?`<b>All</b><span>day</span>`:`<b>${fmtTime(s.start_time)}</b><span>${fmtTime(s.end_time)||""}</span>`}</div>
         <div class="s-mid">
@@ -778,8 +806,6 @@ function boardHtml(){
       </button>
       ${open?assignPanel(s,m,loads):""}
     </article>`;
-  });
-  return html;
 }
 function assignPanel(s,m,loads){
   const sq=squadById(s.squad_id);
@@ -805,6 +831,42 @@ function assignPanel(s,m,loads){
   if(showNote(s)) html+=`<div class="note">${esc(s.note)}</div>`;
   html+=`<div class="legend">★ home squad &nbsp;·&nbsp; number = sessions she's working &nbsp;·&nbsp; – = hasn't answered</div>`;
   html+=`</div>`;
+  return html;
+}
+
+function boardCalHtml(rows, C, conflicts, loads){
+  const today=todayStr();
+  if(!S.bCalMonth){ const [y,m]=today.split("-").map(Number); S.bCalMonth={y, m:m-1}; }
+  if(S.bCalSel===null) S.bCalSel=today;
+  const byDate={};
+  rows.forEach(r=>{ (byDate[r.s.date] ??= []).push(r); });
+  const pillFor=r=>{
+    const cls=C?(r.a==="in"?"p-in":r.a==="out"?"p-out":"p-need")
+               :(r.m.level==="set"?"p-set":r.m.level==="thin"?"p-thin":"p-hole");
+    const t=r.s.all_day?"All day":fmtTime(r.s.start_time);
+    const sq=squadById(r.s.squad_id);
+    return `<span class="pill ${cls}">${esc(t)}<span class="sq"> ${esc(sq?.name||"")}</span></span>`;
+  };
+  let html=calGrid({month:S.bCalMonth, sel:S.bCalSel, byDate, pillFor, cap:3, acts:{prev:"bcalprev",next:"bcalnext",day:"bcalday"}});
+  html+= C
+    ? `<div class="callegend">
+        <span><i class="sw sw-in"></i>${esc(C.name)} in</span>
+        <span><i class="sw sw-out"></i>Out</span>
+        <span><i class="sw sw-need"></i>Silent</span>
+      </div>`
+    : `<div class="callegend">
+        <span><i class="sw sw-set"></i>Covered</span>
+        <span><i class="sw sw-thin"></i>Thin</span>
+        <span><i class="sw sw-holepill"></i>Hole</span>
+      </div>`;
+  const sel=(byDate[S.bCalSel]||[]);
+  const sd=S.bCalSel?fmtDate(S.bCalSel):null;
+  if(S.bCalSel){
+    html+=`<div class="day"><span class="day-dow ${S.bCalSel===today?"today":""}">${S.bCalSel===today?"Today":sd.dow}</span><span class="day-date">${sd.mon} ${sd.day}</span><span class="day-rule"></span></div>`;
+    html+= sel.length ? sel.map(r=>boardRow(r, C, conflicts, loads)).join("") : `<p class="mutetxt">Nothing on this day${S.levelFilter||S.answerFilter?" for that filter":""}.</p>`;
+  } else {
+    html+=`<p class="mutetxt" style="margin-top:14px">Tap a day to work its sessions.</p>`;
+  }
   return html;
 }
 
@@ -906,16 +968,17 @@ $app.addEventListener("click", e=>{
   else if(act==="availview"){ S.availView=el.dataset.v;
     try{ localStorage.setItem("gc_avail_view", S.availView); }catch(err){} render(); }
   else if(act==="calprev"||act==="calnext"){
-    const d=act==="calnext"?1:-1; let {y,m}=S.calMonth; m+=d;
-    if(m<0){m=11;y--;} if(m>11){m=0;y++;}
-    S.calMonth={y,m};
-    const mine=activeUpcoming().filter(s=>S.me.squad_ids.includes(s.squad_id));
-    const pref=`${y}-${pad2(m+1)}-`;
-    const firstIn=mine.find(s=>s.date.startsWith(pref));
-    const t=todayStr();
-    S.calSel=t.startsWith(pref)?t:(firstIn?firstIn.date:null);
-    render(); }
+    const dates=[...new Set(activeUpcoming().filter(s=>S.me.squad_ids.includes(s.squad_id)).map(s=>s.date))].sort();
+    const r=monthShift(S.calMonth, act==="calnext"?1:-1, dates);
+    S.calMonth=r.month; S.calSel=r.sel; render(); }
   else if(act==="calday"){ S.calSel=el.dataset.d; render(); }
+  else if(act==="boardview"){ S.boardView=el.dataset.v;
+    try{ localStorage.setItem("gc_board_view", S.boardView); }catch(err){} render(); }
+  else if(act==="bcalprev"||act==="bcalnext"){
+    const dates=[...new Set(activeUpcoming().map(s=>s.date))].sort();
+    const r=monthShift(S.bCalMonth, act==="bcalnext"?1:-1, dates);
+    S.bCalMonth=r.month; S.bCalSel=r.sel; render(); }
+  else if(act==="bcalday"){ S.bCalSel=el.dataset.d; render(); }
   else if(act==="copyholes") copyHoles();
   else if(act==="copythin") copyThin();
   else if(act==="copysilent") copySilent();
